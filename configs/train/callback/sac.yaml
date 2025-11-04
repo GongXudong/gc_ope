@@ -8,3 +8,4 @@
   save_freq: 1
   save_path: checkpoints/${env.env_str}/${experiment_name}
   save_checkpoint_every_n_timesteps: 10000
+  save_replay_buffer: true

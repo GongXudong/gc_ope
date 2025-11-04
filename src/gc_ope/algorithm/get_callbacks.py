@@ -30,6 +30,7 @@ def get_callback_list(callback_cfg: DictConfig, env_cfg: DictConfig, env: VecEnv
             checkpoint_on_event = CheckpointCallback(
                 save_freq=cfg.save_freq,
                 save_path=str((PROJECT_ROOT_DIR / cfg.save_path).absolute()),
+                save_replay_buffer=cfg.save_replay_buffer,
             )
             event_callback = EveryNTimesteps(
                 n_steps=cfg.save_checkpoint_every_n_timesteps,
