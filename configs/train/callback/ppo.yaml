@@ -1,0 +1,10 @@
+- type: MyEvalCallback
+  best_model_save_path: checkpoints/${env.env_str}/${experiment_name}
+  log_path: logs/${env.env_str}/${experiment_name}
+  eval_freq: 20480
+  evaluate_nums_in_callback: 3  # 实际评估的数量为：n_eval_episodes = ${env.callback_env.num_process} * 3
+  deterministic: true
+- type: EveryNTimesteps_SaveCheckpoints
+  save_freq: 1
+  save_path: checkpoints/${env.env_str}/${experiment_name}
+  save_checkpoint_every_n_timesteps: 2000000

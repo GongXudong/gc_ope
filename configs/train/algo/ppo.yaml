@@ -1,0 +1,14 @@
+type: ppo
+policy: MultiInputPolicy  # MultiInputPolicy, MlpPolicy, CnnPolicy
+seed: 2
+batch_size: 4096
+gamma: 0.995
+n_steps: 2048
+n_epochs: 5
+ent_coef: 0.0
+net_arch: [128, 128]
+use_sde: true
+normalize_advantage: true
+learning_rate_decay: true
+learning_rate: 3e-4
+device: cpu

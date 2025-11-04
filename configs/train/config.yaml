@@ -1,0 +1,11 @@
+defaults:
+  - algo: ppo
+  - env: flycraft_for_ppo
+  - callback: ppo
+  - evaluate: flycraft
+  - _self_
+
+experiment_name: ???
+train_steps: 1e6
+ckpt_path: checkpoints/${env.env_str}/${experiment_name}
+log_path: logs/${env.env_str}/${experiment_name}
