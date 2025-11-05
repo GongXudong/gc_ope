@@ -8,3 +8,4 @@ algo_type: sac
 process_num: 4
 seed: ???
 eval_res_csv_file_suffix: eval_res
+gamma: 0.995  # 用于评估中计算折扣累计奖励

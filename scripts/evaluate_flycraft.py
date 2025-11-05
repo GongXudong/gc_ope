@@ -18,6 +18,7 @@ from flycraft.utils.load_config import load_config
 
 from gc_ope.env.get_env import get_flycraft_env
 
+
 PROJECT_ROOT_DIR = Path(__file__).parent.parent
 
 
@@ -45,6 +46,7 @@ def rollout(
     target_goals_v: list,
     target_goals_mu: list,
     target_goals_chi: list,
+    gamma: float=0.995,
     seed: int=42,
 ):
     target_goals = pd.DataFrame({
@@ -88,6 +90,8 @@ def rollout(
         "achieved v": [],
         "achieved mu": [],
         "achieved chi": [],
+        "cumulative_rewards": [],
+        "discounted_cumulative_rewards": [],
     }
 
     # 枚举任务
@@ -103,11 +107,20 @@ def rollout(
 
         terminate = False
         s_index = 0
+        reward_list = []
+
         while not terminate:
             action, _ = algo.predict(observation=obs, deterministic=True)
             obs, reward, terminate, truncated, info = env.step(action=action)
-            
+
+            reward_list.append(reward)
             s_index += 1
+        
+        reward_arr = np.array(reward_list)
+        cumulative_rewards = reward_arr.sum()
+
+        gammas = np.power(gamma, np.arange(len(reward_arr)))
+        discounted_cumulative_rewards = np.sum(reward_arr * gammas)
 
         # 记录该episode信息
         res_dict["v"].append(target["v"])
@@ -118,6 +131,8 @@ def rollout(
         res_dict["achieved chi"].append(deepcopy(info["plane_next_state"]["chi"]))
         res_dict["length"].append(s_index)
         res_dict["termination"].append(termination_shotcut(info["termination"]))
+        res_dict["cumulative_rewards"].append(cumulative_rewards)
+        res_dict["discounted_cumulative_rewards"].append(discounted_cumulative_rewards)
         
     return res_dict
 
@@ -204,7 +219,8 @@ def evaluate_agent(cfg: DictConfig) -> None:
                     list(target.v),
                     list(target.mu),
                     list(target.chi),
-                    cfg.seed
+                    cfg.gamma,
+                    cfg.seed,
                 ] for target in chunks]
             )
 
