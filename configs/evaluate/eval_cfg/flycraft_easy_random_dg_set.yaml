@@ -1,0 +1,5 @@
+dg_gen_method: random  # random or fixed
+eval_dg_num: 1000
+v_interval: 10
+mu_interval: 2
+chi_interval: 2

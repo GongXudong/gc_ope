@@ -12,7 +12,7 @@ from omegaconf import DictConfig, OmegaConf
 
 from stable_baselines3.common.logger import configure, Logger
 
-from gc_ope.env.get_env import get_vec_env
+from gc_ope.env.get_vec_env import get_vec_env
 from gc_ope.algorithm.get_algorithm import get_algo
 from gc_ope.algorithm.get_callbacks import get_callback_list
 from gc_ope.algorithm.get_evaluate_method import get_evaluate_method

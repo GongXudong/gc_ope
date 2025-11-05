@@ -1,0 +1,7 @@
+# 训练中的VecEnv配置
+env_id: FlyCraft-V0
+config_file: configs/env_configs/flycraft/env_config_for_ppo_easy.json
+custom_config:
+  debug_mode: false
+  flag_str: Evaluation
+env_str: flycraft
