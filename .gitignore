@@ -12,4 +12,5 @@ wheels/
 checkpoints/
 outputs/
 logs/
+plots/
 f16trace.csv
