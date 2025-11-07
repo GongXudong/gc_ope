@@ -4,7 +4,7 @@ config_file: configs/env_configs/flycraft/env_config_for_ppo_easy.json
 train_env:
   num_process: 64
   seed: 3
-  custom_config: 
+  custom_config:
     debug_mode: true
     flag_str: Train
 evaluation_env:

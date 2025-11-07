@@ -2,7 +2,7 @@ from pathlib import Path
 
 from stable_baselines3.common.env_checker import check_env
 
-from gc_ope.env.get_env import get_flycraft_envs
+from gc_ope.env.get_vec_env import get_flycraft_envs
 from gc_ope.utils.load_config_with_hydra import load_config
 
 
@@ -14,6 +14,10 @@ def test_get_flycraft_vec_env():
         config_path="../../../configs/train",
         config_name="config",
     )
+
+    cfg.env.train_env.num_process = 2
+    cfg.env.evaluation_env.num_process = 1
+    cfg.env.callback_env.num_process = 1
 
     print(cfg.env)
 
@@ -27,8 +31,6 @@ def test_get_flycraft_vec_env():
         # action = train_env.action_space.sample()
         # print(action.shape)
         obs, reward, done, info = train_env.step(actions)
-    
-
 
 
 if __name__ == "__main__":

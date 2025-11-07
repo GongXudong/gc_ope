@@ -13,4 +13,6 @@ checkpoints/
 outputs/
 logs/
 plots/
+
+.coverage
 f16trace.csv
