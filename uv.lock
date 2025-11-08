@@ -381,6 +381,7 @@ dependencies = [
     { name = "hydra-core" },
     { name = "numpy" },
     { name = "omegaconf" },
+    { name = "panda-gym" },
     { name = "ray" },
     { name = "scikit-learn" },
     { name = "scipy" },
@@ -405,6 +406,7 @@ requires-dist = [
     { name = "hydra-core", specifier = ">=1.3.2" },
     { name = "numpy", specifier = ">=2.3.4" },
     { name = "omegaconf", specifier = ">=2.3.0" },
+    { name = "panda-gym", specifier = ">=3.0.7" },
     { name = "ray", specifier = ">=2.51.1" },
     { name = "scikit-learn", specifier = ">=1.7.2" },
     { name = "scipy", specifier = ">=1.16.3" },
@@ -1119,6 +1121,21 @@ wheels = [
 ]
 
 [[package]]
+name = "panda-gym"
+version = "3.0.7"
+source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
+dependencies = [
+    { name = "gymnasium" },
+    { name = "numpy" },
+    { name = "pybullet" },
+    { name = "scipy" },
+]
+sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/78/b3/899d8afe0dc14beab5d97a83fcdf81da15a3d0517c21741a352f7279f176/panda_gym-3.0.7.tar.gz", hash = "sha256:77e3110c7cb6855dd4c10c31f13401b19c3b0e30577e7f5029f946e59b171b6a" }
+wheels = [
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/1a/aa/4eb790df24fc475e8c31c960c83a4aec2991e06293eed1e06c0eab9145bb/panda_gym-3.0.7-py3-none-any.whl", hash = "sha256:cfb0b1eb1d4e59d6582ed2ac512e69e67d5c3d80862f1ca7e9bb1cd9eaaaf090" },
+]
+
+[[package]]
 name = "pandas"
 version = "2.3.3"
 source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
@@ -1270,6 +1287,12 @@ wheels = [
     { url = "https://pypi.tuna.tsinghua.edu.cn/packages/21/51/0b1cbad62074439b867b4e04cc09b93f6699d78fd191bed2bbb44562e077/protobuf-6.33.0-cp39-abi3-manylinux2014_x86_64.whl", hash = "sha256:35be49fd3f4fefa4e6e2aacc35e8b837d6703c37a2168a55ac21e9b1bc7559ef", size = 323172, upload-time = "2025-10-15T20:39:47.465Z" },
     { url = "https://pypi.tuna.tsinghua.edu.cn/packages/07/d1/0a28c21707807c6aacd5dc9c3704b2aa1effbf37adebd8caeaf68b17a636/protobuf-6.33.0-py3-none-any.whl", hash = "sha256:25c9e1963c6734448ea2d308cfa610e692b801304ba0908d7bfa564ac5132995", size = 170477, upload-time = "2025-10-15T20:39:51.311Z" },
 ]
+
+[[package]]
+name = "pybullet"
+version = "3.2.7"
+source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
+sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/de/95/b9a98cd4ed948d4f25a7d0b13cb0c1f87e58dc6d113be9e18940641eb25f/pybullet-3.2.7.tar.gz", hash = "sha256:042879db8d101ac7590dee475fc6aded508b85fe1273fdbbfde1d88bd200e14f", size = 80508379, upload-time = "2025-01-30T00:34:00.527Z" }
 
 [[package]]
 name = "pygments"

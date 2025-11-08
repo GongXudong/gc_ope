@@ -1,19 +1,18 @@
-# 训练中的VecEnv配置
-env_id: FlyCraft-V0
+env_id: FlyCraft-v0
 config_file: configs/env_configs/flycraft/env_config_for_ppo_easy.json
-train_env:
+train_env:  # 训练中的VecEnv配置
   num_process: 64
   seed: 3
   custom_config:
     debug_mode: true
     flag_str: Train
-evaluation_env:
+evaluation_env:  # 评估中的VecEnv配置
   num_process: 32
   seed: 6
   custom_config:
     debug_mode: false
     flag_str: Evaluation
-callback_env:
+callback_env:  # Callback中的VecEnv配置
   num_process: 32
   seed: 7
   custom_config:

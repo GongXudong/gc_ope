@@ -63,7 +63,7 @@ def get_sac(algo_cfg: DictConfig, env: VecEnv) -> OffPolicyAlgorithm:
         batch_size=int(algo_cfg.batch_size),
         policy_kwargs=dict(
             net_arch=OmegaConf.to_container(algo_cfg.net_arch),
-            activation_fn=th.nn.Tanh
+            activation_fn=th.nn.Tanh,
         ),
         device=algo_cfg.device,
     )

@@ -1,0 +1,15 @@
+type: her
+policy: MultiInputPolicy  # MultiInputPolicy, MlpPolicy, CnnPolicy
+seed: 2
+use_her: true
+her_n_sampled_goal: 4
+her_goal_selection_strategy: future
+buffer_size: 2e5
+learning_starts: 1024
+gradient_steps: 1
+learning_rate_decay: true
+learning_rate: 3e-4
+gamma: 0.95
+batch_size: 256
+net_arch: [128, 128]
+device: cuda

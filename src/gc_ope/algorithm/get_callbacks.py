@@ -2,7 +2,7 @@ from pathlib import Path
 from omegaconf import DictConfig
 
 from stable_baselines3.common.vec_env import VecEnv
-from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback, EveryNTimesteps
+from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback, EveryNTimesteps, EvalCallback
 
 from gc_ope.algorithm.utils.my_eval_callback import MyEvalCallback
 
@@ -26,6 +26,17 @@ def get_callback_list(callback_cfg: DictConfig, env_cfg: DictConfig, env: VecEnv
                 render=False,
             )
             callback_list.append(my_eval_callback)
+        elif cfg.type == "EvalCallback":
+            eval_callback = EvalCallback(
+                eval_env=env,
+                best_model_save_path=str((PROJECT_ROOT_DIR / cfg.best_model_save_path).absolute()),
+                log_path=str((PROJECT_ROOT_DIR / cfg.log_path).absolute()), 
+                eval_freq=cfg.eval_freq,
+                n_eval_episodes=cfg.evaluate_nums_in_callback * env_cfg.callback_env.num_process,
+                deterministic=cfg.deterministic, 
+                render=False,
+            )
+            callback_list.append(eval_callback)
         elif cfg.type == "EveryNTimesteps_SaveCheckpoints":
             checkpoint_on_event = CheckpointCallback(
                 save_freq=cfg.save_freq,

@@ -1,0 +1,11 @@
+env_id: MyReach-v0
+train_env:  # 训练中的VecEnv配置
+  num_process: 1
+  seed: 3
+evaluation_env:  # 评估中的VecEnv配置
+  num_process: 16
+  seed: 6
+callback_env:  # Callback中的VecEnv配置
+  num_process: 16
+  seed: 7
+env_str: myreach

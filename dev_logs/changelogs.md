@@ -1,8 +1,12 @@
 # GC-OPE
 
+## 2025-11-07
+
+* add KDE evaluator (class: EvaluationResultContainer, WeightedEvaluationResultContainer, KDEEvaluator).
+
 ## 2025-11-06
 
-* add OPE_roadmaps (2025-11-06)
+* add OPE_roadmaps.
 
 ## Before 2025-11-05
 
