@@ -1,0 +1,7 @@
+#!/bin/bash
+
+uv run scripts/train.py experiment_name=easy/ppo/seed_1 algo=ppo_for_my_reach callback=ppo callback.0.eval_freq=10000 callback.1.save_checkpoint_every_n_timesteps=10000 env=my_reach_for_ppo evaluate=my_reach train_steps=1e6 algo.seed=5 env.train_env.seed=2 env.evaluation_env.seed=8 env.callback_env.seed=9
+uv run scripts/train.py experiment_name=easy/ppo/seed_2 algo=ppo_for_my_reach callback=ppo callback.0.eval_freq=10000 callback.1.save_checkpoint_every_n_timesteps=10000 env=my_reach_for_ppo evaluate=my_reach train_steps=1e6 algo.seed=11 env.train_env.seed=17 env.evaluation_env.seed=18 env.callback_env.seed=13
+uv run scripts/train.py experiment_name=easy/ppo/seed_3 algo=ppo_for_my_reach callback=ppo callback.0.eval_freq=10000 callback.1.save_checkpoint_every_n_timesteps=10000 env=my_reach_for_ppo evaluate=my_reach train_steps=1e6 algo.seed=23 env.train_env.seed=29 env.evaluation_env.seed=22 env.callback_env.seed=27
+uv run scripts/train.py experiment_name=easy/ppo/seed_4 algo=ppo_for_my_reach callback=ppo callback.0.eval_freq=10000 callback.1.save_checkpoint_every_n_timesteps=10000 env=my_reach_for_ppo evaluate=my_reach train_steps=1e6 algo.seed=39 env.train_env.seed=33 env.evaluation_env.seed=31 env.callback_env.seed=36
+uv run scripts/train.py experiment_name=easy/ppo/seed_5 algo=ppo_for_my_reach callback=ppo callback.0.eval_freq=10000 callback.1.save_checkpoint_every_n_timesteps=10000 env=my_reach_for_ppo evaluate=my_reach train_steps=1e6 algo.seed=42 env.train_env.seed=45 env.evaluation_env.seed=44 env.callback_env.seed=49
