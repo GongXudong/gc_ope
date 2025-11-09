@@ -1,4 +1,9 @@
-env_id: MyReach-v0
+env_id: MyReachSparse-v0
+goal_range: 0.3
+distance_threshold: 0.01
+reward_type: sparse
+control_type: joints
+max_episode_steps: 100
 train_env:  # 训练中的VecEnv配置
   num_process: 1
   seed: 3

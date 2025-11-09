@@ -13,7 +13,7 @@ from gc_ope.env.utils.my_reach.register_env import register_my_env as register_m
 
 
 gym.register_envs(flycraft)
-register_my_reach(goal_range=0.3, distance_threshold=0.05, reward_type="sparse", control_type="joints", max_episode_steps=100)
+register_my_reach(goal_range=0.3, distance_threshold=0.02, control_type="joints", max_episode_steps=100)
 PROJECT_ROOT_DIR = Path(__file__).parent.parent.parent.parent
 
 
