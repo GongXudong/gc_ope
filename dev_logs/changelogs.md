@@ -1,5 +1,9 @@
 # GC-OPE
 
+## 2025-11-11
+
+* Add evaluation scripts on Reach.
+
 ## 2025-11-08
 
 * Add training scripts on Reach.

@@ -1,5 +1,5 @@
 # 训练中的VecEnv配置
-env_id: FlyCraft-V0
+env_id: FlyCraft-v0
 config_file: configs/env_configs/flycraft/env_config_for_sac_easy.json
 custom_config:
   debug_mode: false

@@ -14,53 +14,34 @@ from ray.util.multiprocessing import Pool
 
 from stable_baselines3 import PPO, SAC
 
-from gc_ope.env.get_env import get_flycraft_env
+from gc_ope.env.get_env import get_gym_env
 
 
 PROJECT_ROOT_DIR = Path(__file__).parent.parent
 
 
-def termination_shotcut(termination_str: str):
-    if termination_str.find("reach_target") != -1:
-        return "reach target"
-    if termination_str.find("timeout") != -1:
-        return "timeout"
-    if termination_str.find("move_away") != -1:
-        return "continuous move away"
-    if termination_str.find("roll") != -1:
-        return "continuous roll"
-    if termination_str.find("crash") != -1:
-        return "crash"
-    if termination_str.find("extreme") != -1:
-        return "extreme state"
-    if termination_str.find("negative") != -1:
-        return "negative overload"
-
 def rollout(
     policy_dir_str: str, 
     algo_type: str,
-    env_config_path: str,
-    env_custom_config: dict,
-    target_goals_v: list,
-    target_goals_mu: list,
-    target_goals_chi: list,
+    env_id: str,
+    target_goals_x: list,
+    target_goals_y: list,
+    target_goals_z: list,
     gamma: float=0.995,
     seed: int=42,
 ):
     target_goals = pd.DataFrame({
-        "v": target_goals_v,
-        "mu": target_goals_mu,
-        "chi": target_goals_chi,
+        "x": target_goals_x,
+        "y": target_goals_y,
+        "z": target_goals_z,
     })
 
-    env = get_flycraft_env(
-        seed=seed,
-        config_file=env_config_path,
-        custom_config=env_custom_config,
+    env = get_gym_env(
+        env_id=env_id,
     )
     env.reset(seed=seed)
 
-    env.unwrapped.task.goal_sampler.use_fixed_goal = True
+    MAX_EPISODE_STEPS = env.get_wrapper_attr("_max_episode_steps")
 
     if algo_type == "ppo":
         algo_class = PPO
@@ -80,14 +61,14 @@ def rollout(
     algo.policy.set_training_mode(False)
 
     res_dict = {
-        "v": [],
-        "mu": [],
-        "chi": [],
+        "x": [],
+        "y": [],
+        "z": [],
         "length": [],
         "termination": [],
-        "achieved v": [],
-        "achieved mu": [],
-        "achieved chi": [],
+        "achieved x": [],
+        "achieved y": [],
+        "achieved z": [],
         "cumulative_rewards": [],
         "discounted_cumulative_rewards": [],
     }
@@ -95,19 +76,24 @@ def rollout(
     # 枚举任务
     for index, target in tqdm(target_goals.iterrows(), total=target_goals.shape[0]):
         # 为环境设置任务
-        # target_v, target_mu, target_chi, expert_length = target["v"], target["mu"], target["chi"], target["length"]
-        env.unwrapped.task.goal_sampler.goal_v = target["v"]
-        env.unwrapped.task.goal_sampler.goal_mu = target["mu"]
-        env.unwrapped.task.goal_sampler.goal_chi = target["chi"]
-
-        # 采样一个episode
+        # target_x, target_y, target_z = target["x"], target["y"], target["z"]
         obs, info = env.reset()
+        tmp_episode_goal = np.array([target["x"], target["y"], target["z"]])
+        env.unwrapped.task.goal = tmp_episode_goal
+        env.unwrapped.task.sim.set_base_pose("target", tmp_episode_goal, np.array([0.0, 0.0, 0.0, 1.0]))
 
-        terminate = False
+        obs = {
+            "achieved_goal": env.unwrapped.task.get_achieved_goal().astype(np.float32),
+            "desired_goal": env.unwrapped.task.get_goal().astype(np.float32),
+            "observation": env.unwrapped.robot.get_obs().astype(np.float32)
+        }
+
+        # 
+        terminate, truncated = False, False
         s_index = 0
         reward_list = []
 
-        while not terminate:
+        while not (terminate or truncated):
             action, _ = algo.predict(observation=obs, deterministic=True)
             obs, reward, terminate, truncated, info = env.step(action=action)
 
@@ -121,17 +107,17 @@ def rollout(
         discounted_cumulative_rewards = np.sum(reward_arr * gammas)
 
         # 记录该episode信息
-        res_dict["v"].append(target["v"])
-        res_dict["mu"].append(target["mu"])
-        res_dict["chi"].append(target["chi"])
-        res_dict["achieved v"].append(deepcopy(info["plane_next_state"]["v"]))
-        res_dict["achieved mu"].append(deepcopy(info["plane_next_state"]["mu"]))
-        res_dict["achieved chi"].append(deepcopy(info["plane_next_state"]["chi"]))
+        res_dict["x"].append(target["x"])
+        res_dict["y"].append(target["y"])
+        res_dict["z"].append(target["z"])
+        res_dict["achieved x"].append(obs["achieved_goal"][0])
+        res_dict["achieved y"].append(obs["achieved_goal"][1])
+        res_dict["achieved z"].append(obs["achieved_goal"][2])
         res_dict["length"].append(s_index)
-        res_dict["termination"].append(termination_shotcut(info["termination"]))
+        res_dict["termination"].append("reach target" if s_index < MAX_EPISODE_STEPS else "timeout")
         res_dict["cumulative_rewards"].append(cumulative_rewards)
         res_dict["discounted_cumulative_rewards"].append(discounted_cumulative_rewards)
-        
+
     return res_dict
 
 
@@ -140,17 +126,16 @@ def evaluate_agent(cfg: DictConfig) -> None:
     
     # 1.确定需要测试的desired_goal集合
     # 1.1 从环境中读取desired_goal的范围
-    env = get_flycraft_env(
-        seed=0,
-        config_file=str(PROJECT_ROOT_DIR / cfg.env.config_file),
-        custom_config=OmegaConf.to_container(cfg.env.custom_config),
+    env = get_gym_env(
+        env_id=cfg.env.env_id,
     )
-    v_min = env.unwrapped.task.config["goal"]["v_min"]
-    v_max = env.unwrapped.task.config["goal"]["v_max"]
-    mu_min = env.unwrapped.task.config["goal"]["mu_min"]
-    mu_max = env.unwrapped.task.config["goal"]["mu_max"]
-    chi_min = env.unwrapped.task.config["goal"]["chi_min"]
-    chi_max = env.unwrapped.task.config["goal"]["chi_max"]
+
+    x_min = env.unwrapped.task.goal_range_low[0]
+    x_max = env.unwrapped.task.goal_range_high[0]
+    y_min = env.unwrapped.task.goal_range_low[1]
+    y_max = env.unwrapped.task.goal_range_high[1]
+    z_min = env.unwrapped.task.goal_range_low[2]
+    z_max = env.unwrapped.task.goal_range_high[2]
 
     EPS = 1e-6
     
@@ -159,23 +144,23 @@ def evaluate_agent(cfg: DictConfig) -> None:
 
         # 在desired_goal space内随机生成要测试的目标
         evaluation_goals = pd.DataFrame({
-            "v": [np.random.random() * (v_max - v_min) + v_min for i in range(cfg.eval_cfg.eval_dg_num)],
-            "mu": [np.random.random() * (mu_max - mu_min) + mu_min for i in range(cfg.eval_cfg.eval_dg_num)],
-            "chi": [np.random.random() * (chi_max - chi_min) + chi_min for i in range(cfg.eval_cfg.eval_dg_num)],
+            "x": [np.random.random() * (x_max - x_min) + x_min for i in range(cfg.eval_cfg.eval_dg_num)],
+            "y": [np.random.random() * (y_max - y_min) + y_min for i in range(cfg.eval_cfg.eval_dg_num)],
+            "z": [np.random.random() * (z_max - z_min) + z_min for i in range(cfg.eval_cfg.eval_dg_num)],
         })
     elif cfg.eval_cfg.dg_gen_method == "fixed":
 
         # 在desired_goal space内以固定间隔生成要测试的目标
-        v_list = np.arange(start=v_min, stop=v_max+EPS, step=cfg.eval_cfg.v_interval)
-        mu_list = np.arange(start=mu_min, stop=mu_max+EPS, step=cfg.eval_cfg.mu_interval)
-        chi_list = np.arange(start=chi_min, stop=chi_max+EPS, step=cfg.eval_cfg.chi_interval)
+        x_list = np.arange(start=x_min, stop=x_max+EPS, step=cfg.eval_cfg.x_interval)
+        y_list = np.arange(start=y_min, stop=y_max+EPS, step=cfg.eval_cfg.y_interval)
+        z_list = np.arange(start=z_min, stop=z_max+EPS, step=cfg.eval_cfg.z_interval)
 
-        combinations = np.array(list(itertools.product(v_list, mu_list, chi_list)))
+        combinations = np.array(list(itertools.product(x_list, y_list, z_list)))
         
         evaluation_goals = pd.DataFrame({
-            "v": combinations[:, 0],
-            "mu": combinations[:, 1],
-            "chi": combinations[:, 2],
+            "x": combinations[:, 0],
+            "y": combinations[:, 1],
+            "z": combinations[:, 2],
         })
     else:
         raise ValueError(f"Config Value Error: the value of 'dg_gen_method' must be one of: randomm, fixed!")
@@ -212,11 +197,10 @@ def evaluate_agent(cfg: DictConfig) -> None:
                 [[
                     str(file),
                     cfg.algo_type,
-                    str(PROJECT_ROOT_DIR / cfg.env.config_file),
-                    {},
-                    list(target.v),
-                    list(target.mu),
-                    list(target.chi),
+                    cfg.env.env_id,
+                    list(target.x),
+                    list(target.y),
+                    list(target.z),
                     cfg.gamma,
                     cfg.seed,
                 ] for target in chunks]

@@ -1,9 +1,4 @@
 env_id: MyReachDense-v0
-goal_range: 0.3
-distance_threshold: 0.01
-reward_type: sparse
-control_type: joints
-max_episode_steps: 100
 train_env:  # 训练中的VecEnv配置
   num_process: 1
   seed: 3
@@ -13,4 +8,4 @@ evaluation_env:  # 评估中的VecEnv配置
 callback_env:  # Callback中的VecEnv配置
   num_process: 16
   seed: 7
-env_str: myreach
+env_str: myreach_dense

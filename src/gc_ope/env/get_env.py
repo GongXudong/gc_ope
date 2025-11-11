@@ -7,9 +7,11 @@ import flycraft
 from flycraft.utils_common.dict_utils import update_nested_dict
 
 from gc_ope.env.utils.flycraft.vec_env_helper import make_env as make_flycraft_env
+from gc_ope.env.utils.my_reach.register_env import register_my_env as register_my_reach
 
 
 gym.register_envs(flycraft)
+register_my_reach(goal_range=0.3, distance_threshold=0.02, control_type="joints", max_episode_steps=100)
 PROJECT_ROOT_DIR = Path(__file__).parent.parent.parent.parent
 
 
@@ -31,6 +33,8 @@ def get_env(env_cfg: DictConfig) -> gym.Env:
             config_file=str(PROJECT_ROOT_DIR / env_cfg.config_file),
             custom_config=OmegaConf.to_container(env_cfg.train_env.custom_config),
         )
+    elif env_cfg.env_id.startswith("MyReach"):
+        return get_gym_env(env_cfg.env_id)
     else:
         raise ValueError(f"Can not get vec_env for env: {env_cfg.env_id}!")
 
@@ -42,3 +46,8 @@ def get_flycraft_env(seed: int, config_file: str, custom_config: dict) -> gym.En
         config_file=config_file,
         custom_config=custom_config,
     )()
+
+def get_gym_env(env_id: str) -> gym.Env:
+    return gym.make(
+        id=env_id,
+    )
