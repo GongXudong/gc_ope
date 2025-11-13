@@ -1,5 +1,9 @@
 # GC-OPE
 
+## 2025-11-12
+
+* TODO: add training/evaluation scripts on PointMaze.
+
 ## 2025-11-11
 
 * Add evaluation scripts on Reach.
