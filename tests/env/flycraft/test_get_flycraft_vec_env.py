@@ -1,26 +1,20 @@
-from pathlib import Path
-
-from stable_baselines3.common.env_checker import check_env
-
-from gc_ope.env.get_vec_env import get_myreach_envs, get_vec_env
+from gc_ope.env.get_vec_env import get_flycraft_envs
 from gc_ope.utils.load_config_with_hydra import load_config
 
 
-PROJECT_ROOT_DIR = Path(__file__).parent.parent.parent.parent
-
-
-def test_get_myreach_vec_env():
+def test_get_flycraft_vec_env():
     cfg = load_config(
         config_path="../../../configs/train",
         config_name="config",
     )
 
-    # cfg.env.env_id = "MyReach-v0"
     cfg.env.train_env.num_process = 2
     cfg.env.evaluation_env.num_process = 1
     cfg.env.callback_env.num_process = 1
 
-    train_env, eval_env, callback_env = get_vec_env(cfg.env)
+    print(cfg.env)
+
+    train_env, eval_env, callback_env = get_flycraft_envs(cfg.env)
 
     # check env
     obs = train_env.reset()
@@ -30,10 +24,6 @@ def test_get_myreach_vec_env():
         # action = train_env.action_space.sample()
         # print(action.shape)
         obs, reward, done, info = train_env.step(actions)
-        print(actions, obs, reward)
-
-    print(train_env.get_attr(attr_name="unwrapped", indices=[0])[0].task.distance_threshold)
-    # print(train_env.get_attr(attr_name="unwrapped.task.distance_threshold", indices=[0]))
 
 if __name__ == "__main__":
-    test_get_myreach_vec_env()
+    test_get_flycraft_vec_env()

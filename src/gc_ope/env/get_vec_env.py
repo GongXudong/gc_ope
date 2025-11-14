@@ -7,13 +7,18 @@ from stable_baselines3.common.vec_env import VecEnv, SubprocVecEnv
 from stable_baselines3.common.env_util import make_vec_env
 import flycraft
 from flycraft.utils_common.dict_utils import update_nested_dict
+import gymnasium_robotics
 
 from gc_ope.env.utils.flycraft.vec_env_helper import get_vec_env as get_flycraft_vec_env
-from gc_ope.env.utils.my_reach.register_env import register_my_env as register_my_reach
+from gc_ope.env.utils.my_reach.register_env import register_my_reach
+from gc_ope.env.utils.my_point_maze.register_env import register_my_point_maze
+# from gc_ope.env.utils.pointmaze.vec_env_helper import make_env as make_pointmaze_env
 
 
 gym.register_envs(flycraft)
 register_my_reach(goal_range=0.3, distance_threshold=0.02, control_type="joints", max_episode_steps=100)
+register_my_point_maze()
+gym.register_envs(gymnasium_robotics)
 PROJECT_ROOT_DIR = Path(__file__).parent.parent.parent.parent
 
 
@@ -32,7 +37,9 @@ def get_vec_env(env_cfg: DictConfig) -> tuple[VecEnv, VecEnv, VecEnv]:
     if env_cfg.env_id.startswith("FlyCraft"):
         return get_flycraft_envs(env_cfg)
     elif env_cfg.env_id.startswith("MyReach"):
-        return get_myreach_envs(env_cfg)
+        return get_my_reach_envs(env_cfg)
+    elif env_cfg.env_id.startswith("MyPointMaze"):
+        return get_my_pointmaze_envs(env_cfg)
     else:
         raise ValueError(f"Can not get vec_env for env: {env_cfg.env_id}!")
 
@@ -82,7 +89,7 @@ def get_flycraft_envs(env_cfg: DictConfig) -> tuple[VecEnv, VecEnv, VecEnv]:
 
     return vec_env, eval_env, eval_env_in_callback
 
-def get_myreach_envs(env_cfg: DictConfig) -> tuple[VecEnv, VecEnv, VecEnv]:
+def get_my_reach_envs(env_cfg: DictConfig) -> tuple[VecEnv, VecEnv, VecEnv]:
 
     # 训练使用的环境
     vec_env = make_vec_env(
@@ -106,6 +113,46 @@ def get_myreach_envs(env_cfg: DictConfig) -> tuple[VecEnv, VecEnv, VecEnv]:
         n_envs=env_cfg.callback_env.num_process,
         seed=env_cfg.callback_env.seed,
         vec_env_cls=SubprocVecEnv,
+    )
+
+    return vec_env, eval_env, eval_env_in_callback
+
+def get_my_pointmaze_envs(env_cfg: DictConfig) -> tuple[VecEnv, VecEnv, VecEnv]:
+    
+    # 训练使用的环境
+    vec_env = make_vec_env(
+        env_id=env_cfg.env_id,
+        n_envs=env_cfg.train_env.num_process,
+        seed=env_cfg.train_env.seed,
+        vec_env_cls=SubprocVecEnv,
+        env_kwargs={
+            "maze_map": env_cfg.maze_map,
+            "continuing_task": env_cfg.continuing_task,
+        }
+    )
+
+    # evaluate_policy使用的测试环境
+    eval_env = make_vec_env(
+        env_id=env_cfg.env_id,
+        n_envs=env_cfg.evaluation_env.num_process,
+        seed=env_cfg.evaluation_env.seed,
+        vec_env_cls=SubprocVecEnv,
+        env_kwargs={
+            "maze_map": env_cfg.maze_map,
+            "continuing_task": env_cfg.continuing_task,
+        }
+    )
+
+    # 回调函数中使用的测试环境
+    eval_env_in_callback = make_vec_env(
+        env_id=env_cfg.env_id,
+        n_envs=env_cfg.callback_env.num_process,
+        seed=env_cfg.callback_env.seed,
+        vec_env_cls=SubprocVecEnv,
+        env_kwargs={
+            "maze_map": env_cfg.maze_map,
+            "continuing_task": env_cfg.continuing_task,
+        }
     )
 
     return vec_env, eval_env, eval_env_in_callback

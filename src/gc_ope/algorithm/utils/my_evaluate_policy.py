@@ -13,6 +13,7 @@ def evaluate_policy_with_success_rate(
     env: Union[gym.Env, VecEnv],
     n_eval_episodes: int = 10,
     deterministic: bool = True,
+    success_key_in_info: str = "is_success",
     render: bool = False,
     callback: Optional[Callable[[Dict[str, Any], Dict[str, Any]], None]] = None,
     reward_threshold: Optional[float] = None,
@@ -125,7 +126,7 @@ def evaluate_policy_with_success_rate(
                         episode_counts[i] += 1
                     current_rewards[i] = 0
                     current_lengths[i] = 0
-                    success_episode_cnt = success_episode_cnt + 1 if infos[i]["is_success"] else success_episode_cnt
+                    success_episode_cnt = success_episode_cnt + 1 if infos[i][success_key_in_info] else success_episode_cnt
 
         observations = new_observations
 
@@ -146,6 +147,7 @@ def evaluate_policy_with_stat(
     env: Union[gym.Env, VecEnv],
     n_eval_episodes: int = 10,
     deterministic: bool = True,
+    success_key_in_info: str = "is_success",
     render: bool = False,
     callback: Optional[Callable[[Dict[str, Any], Dict[str, Any]], None]] = None,
     reward_threshold: Optional[float] = None,
@@ -269,7 +271,7 @@ def evaluate_policy_with_stat(
 
                     current_rewards[i] = 0
                     current_lengths[i] = 0
-                    success_episode_cnt = success_episode_cnt + 1 if infos[i]["is_success"] else success_episode_cnt
+                    success_episode_cnt = success_episode_cnt + 1 if infos[i][success_key_in_info] else success_episode_cnt
 
         observations = new_observations
 

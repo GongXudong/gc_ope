@@ -7,11 +7,14 @@ import flycraft
 from flycraft.utils_common.dict_utils import update_nested_dict
 
 from gc_ope.env.utils.flycraft.vec_env_helper import make_env as make_flycraft_env
-from gc_ope.env.utils.my_reach.register_env import register_my_env as register_my_reach
+from gc_ope.env.utils.my_reach.register_env import register_my_reach
+from gc_ope.env.utils.my_point_maze.register_env import register_my_point_maze
+from gc_ope.env.utils.my_point_maze.vec_env_helper import make_env as make_pointmaze_env
 
 
 gym.register_envs(flycraft)
 register_my_reach(goal_range=0.3, distance_threshold=0.02, control_type="joints", max_episode_steps=100)
+register_my_point_maze()
 PROJECT_ROOT_DIR = Path(__file__).parent.parent.parent.parent
 
 
@@ -35,6 +38,12 @@ def get_env(env_cfg: DictConfig) -> gym.Env:
         )
     elif env_cfg.env_id.startswith("MyReach"):
         return get_gym_env(env_cfg.env_id)
+    elif env_cfg.env_id.startswith("MyPointMaze"):
+        return get_pointmaze_env(
+            seed=env_cfg.train_env.seed,
+            maze_map=env_cfg.maze_map,
+            continuing_task=env_cfg.continuing_task,
+        )
     else:
         raise ValueError(f"Can not get vec_env for env: {env_cfg.env_id}!")
 
@@ -47,7 +56,15 @@ def get_flycraft_env(seed: int, config_file: str, custom_config: dict) -> gym.En
         custom_config=custom_config,
     )()
 
-def get_gym_env(env_id: str) -> gym.Env:
+def get_gym_env(env_id: str, **kwargs) -> gym.Env:
     return gym.make(
         id=env_id,
+        **kwargs
     )
+
+def get_pointmaze_env(seed: int, **kwargs) -> gym.Env:
+    return make_pointmaze_env(
+        rank=0,
+        seed=seed,
+        **kwargs
+    )()

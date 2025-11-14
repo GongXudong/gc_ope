@@ -19,10 +19,11 @@ def get_callback_list(callback_cfg: DictConfig, env_cfg: DictConfig, env: VecEnv
             my_eval_callback = MyEvalCallback(
                 eval_env=env,
                 best_model_save_path=str((PROJECT_ROOT_DIR / cfg.best_model_save_path).absolute()),
-                log_path=str((PROJECT_ROOT_DIR / cfg.log_path).absolute()), 
-                eval_freq=cfg.eval_freq,
+                log_path=str((PROJECT_ROOT_DIR / cfg.log_path).absolute()),
+                eval_freq=int(cfg.eval_freq),
                 n_eval_episodes=cfg.evaluate_nums_in_callback * env_cfg.callback_env.num_process,
-                deterministic=cfg.deterministic, 
+                deterministic=cfg.deterministic,
+                success_key_in_info=cfg.success_key_in_info,
                 render=False,
             )
             callback_list.append(my_eval_callback)
@@ -31,7 +32,7 @@ def get_callback_list(callback_cfg: DictConfig, env_cfg: DictConfig, env: VecEnv
                 eval_env=env,
                 best_model_save_path=str((PROJECT_ROOT_DIR / cfg.best_model_save_path).absolute()),
                 log_path=str((PROJECT_ROOT_DIR / cfg.log_path).absolute()), 
-                eval_freq=cfg.eval_freq,
+                eval_freq=int(cfg.eval_freq),
                 n_eval_episodes=cfg.evaluate_nums_in_callback * env_cfg.callback_env.num_process,
                 deterministic=cfg.deterministic, 
                 render=False,
@@ -39,12 +40,12 @@ def get_callback_list(callback_cfg: DictConfig, env_cfg: DictConfig, env: VecEnv
             callback_list.append(eval_callback)
         elif cfg.type == "EveryNTimesteps_SaveCheckpoints":
             checkpoint_on_event = CheckpointCallback(
-                save_freq=cfg.save_freq,
+                save_freq=int(cfg.save_freq),
                 save_path=str((PROJECT_ROOT_DIR / cfg.save_path).absolute()),
                 save_replay_buffer=cfg.save_replay_buffer,
             )
             event_callback = EveryNTimesteps(
-                n_steps=cfg.save_checkpoint_every_n_timesteps,
+                n_steps=int(cfg.save_checkpoint_every_n_timesteps),
                 callback=checkpoint_on_event,
             )
             callback_list.append(event_callback)

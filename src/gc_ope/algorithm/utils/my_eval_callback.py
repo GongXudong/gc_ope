@@ -66,6 +66,7 @@ class MyEvalCallback(EventCallback):
         log_path: Optional[str] = None,
         best_model_save_path: Optional[str] = None,
         deterministic: bool = True,
+        success_key_in_info: str = "is_success",
         render: bool = False,
         verbose: int = 1,
         warn: bool = True,
@@ -81,7 +82,8 @@ class MyEvalCallback(EventCallback):
         self.eval_freq = eval_freq
         self.best_mean_reward = -np.inf
         self.last_mean_reward = -np.inf
-        
+
+        self.success_key_in_info = success_key_in_info        
         self.best_success_rate = 0.
 
         self.deterministic = deterministic
@@ -132,7 +134,7 @@ class MyEvalCallback(EventCallback):
         info = locals_["info"]
 
         if locals_["done"]:
-            maybe_is_success = info.get("is_success")
+            maybe_is_success = info.get(self.success_key_in_info)
             if maybe_is_success is not None:
                 self._is_success_buffer.append(maybe_is_success)
 
@@ -194,7 +196,7 @@ class MyEvalCallback(EventCallback):
             # Add to current Logger
             self.logger.record("eval/mean_reward", float(mean_reward))
             self.logger.record("eval/mean_ep_length", mean_ep_length)
-
+            
             if len(self._is_success_buffer) > 0:
                 success_rate = np.mean(self._is_success_buffer)
                 if self.verbose >= 1:
@@ -215,7 +217,7 @@ class MyEvalCallback(EventCallback):
             #     if self.callback_on_new_best is not None:
             #         continue_training = self.callback_on_new_best.on_step()
 
-            if success_rate >= self.best_success_rate:
+            if len(self._is_success_buffer) > 0 and success_rate >= self.best_success_rate:
                 if self.verbose >= 1:
                     print("New best success rate !")
                 if self.best_model_save_path is not None:
