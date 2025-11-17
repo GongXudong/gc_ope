@@ -8,10 +8,10 @@ class MyPointMazeEnv(PointMazeEnv):
 
     def __init__(self, maze_map = ..., render_mode = None, reward_type = "sparse", continuing_task = True, reset_target = False, **kwargs):
         super().__init__(maze_map, render_mode, reward_type, continuing_task, reset_target, **kwargs)
-    
+
     def reset(self, *, seed = None, **kwargs):
         """每次reset的初始位置不添加随机噪声。
-        
+
         下面的代码copy自PointMazeEnv的reset()和MazeEnv的reset()
 
         Args:
@@ -30,22 +30,25 @@ class MyPointMazeEnv(PointMazeEnv):
             self.goal = self.add_xy_position_noise(goal)
             reset_pos = self.generate_reset_pos()
         else:
-            if "goal_cell" in kwargs["options"] and kwargs["options"]["goal_cell"] is not None:
-                # assert that goal cell is valid
-                assert self.maze.map_length > kwargs["options"]["goal_cell"][0]
-                assert self.maze.map_width > kwargs["options"]["goal_cell"][1]
-                assert (
-                    self.maze.maze_map[kwargs["options"]["goal_cell"][0]][kwargs["options"]["goal_cell"][1]]
-                    != 1
-                ), f"Goal can't be placed in a wall cell, {kwargs["options"]['goal_cell']}"
-
-                goal = self.maze.cell_rowcol_to_xy(kwargs["options"]["goal_cell"])
-
+            if "goal_xy" in kwargs["options"] and kwargs["options"]["goal_xy"] is not None:
+                self.goal = np.array(kwargs["options"]["goal_xy"])
             else:
-                goal = self.generate_target_goal()
+                if "goal_cell" in kwargs["options"] and kwargs["options"]["goal_cell"] is not None:
+                    # assert that goal cell is valid
+                    assert self.maze.map_length > kwargs["options"]["goal_cell"][0]
+                    assert self.maze.map_width > kwargs["options"]["goal_cell"][1]
+                    assert (
+                        self.maze.maze_map[kwargs["options"]["goal_cell"][0]][kwargs["options"]["goal_cell"][1]]
+                        != 1
+                    ), f"Goal can't be placed in a wall cell, {kwargs["options"]['goal_cell']}"
 
-            # Add noise to goal position
-            self.goal = self.add_xy_position_noise(goal)
+                    goal = self.maze.cell_rowcol_to_xy(kwargs["options"]["goal_cell"])
+
+                else:
+                    goal = self.generate_target_goal()
+
+                # Add noise to goal position
+                self.goal = self.add_xy_position_noise(goal)
 
             if "reset_cell" in kwargs["options"] and kwargs["options"]["reset_cell"] is not None:
                 # assert that goal cell is valid

@@ -40,8 +40,10 @@ def get_env(env_cfg: DictConfig) -> gym.Env:
         return get_gym_env(env_cfg.env_id)
     elif env_cfg.env_id.startswith("MyPointMaze"):
         return get_pointmaze_env(
+            env_id=env_cfg.env_id,
             seed=env_cfg.train_env.seed,
             maze_map=env_cfg.maze_map,
+            reward_type=env_cfg.reward_type,
             continuing_task=env_cfg.continuing_task,
         )
     else:
@@ -62,8 +64,9 @@ def get_gym_env(env_id: str, **kwargs) -> gym.Env:
         **kwargs
     )
 
-def get_pointmaze_env(seed: int, **kwargs) -> gym.Env:
+def get_pointmaze_env(env_id: str, seed: int=0, **kwargs) -> gym.Env:
     return make_pointmaze_env(
+        env_id=env_id,
         rank=0,
         seed=seed,
         **kwargs

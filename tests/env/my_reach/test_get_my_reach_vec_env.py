@@ -1,5 +1,5 @@
 # from gc_ope.env.get_vec_env import get_vec_env
-from gc_ope.env import get_vec_env
+from gc_ope.env.get_vec_env import get_vec_env
 from gc_ope.utils.load_config_with_hydra import load_config
 
 
@@ -14,7 +14,7 @@ def test_get_myreach_vec_env():
     cfg.env.evaluation_env.num_process = 1
     cfg.env.callback_env.num_process = 1
 
-    train_env, eval_env, callback_env = get_vec_env.get_vec_env(cfg.env)
+    train_env, eval_env, callback_env = get_vec_env(cfg.env)
 
     # check env
     obs = train_env.reset()

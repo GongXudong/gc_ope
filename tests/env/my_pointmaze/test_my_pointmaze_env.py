@@ -11,6 +11,7 @@ def test_pointmaze_init():
     env = gym.make(
         id="MyPointMaze_Large_Diverse_G-v3",
         continuing_task=False,
+        reward_type="sparse",
         maze_map=[
             [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
             [1, "r", "g", "g", "g", 1, "g", "g", "g", "g", "g", 1],

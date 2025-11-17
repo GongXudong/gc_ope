@@ -127,6 +127,7 @@ def get_my_pointmaze_envs(env_cfg: DictConfig) -> tuple[VecEnv, VecEnv, VecEnv]:
         vec_env_cls=SubprocVecEnv,
         env_kwargs={
             "maze_map": env_cfg.maze_map,
+            "reward_type": env_cfg.reward_type,
             "continuing_task": env_cfg.continuing_task,
         }
     )
@@ -139,6 +140,7 @@ def get_my_pointmaze_envs(env_cfg: DictConfig) -> tuple[VecEnv, VecEnv, VecEnv]:
         vec_env_cls=SubprocVecEnv,
         env_kwargs={
             "maze_map": env_cfg.maze_map,
+            "reward_type": env_cfg.reward_type,
             "continuing_task": env_cfg.continuing_task,
         }
     )
@@ -151,6 +153,7 @@ def get_my_pointmaze_envs(env_cfg: DictConfig) -> tuple[VecEnv, VecEnv, VecEnv]:
         vec_env_cls=SubprocVecEnv,
         env_kwargs={
             "maze_map": env_cfg.maze_map,
+            "reward_type": env_cfg.reward_type,
             "continuing_task": env_cfg.continuing_task,
         }
     )

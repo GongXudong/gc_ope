@@ -1,8 +1,12 @@
 # GC-OPE
 
-## 2025-11-15
+## 2025-11-18
 
-* TODO: add evaluation scripts on PointMaze.
+* TODO: Add training/evaluation scripts on AntMaze.
+
+## 2025-11-17
+
+* Add evaluation scripts on PointMaze.
 
 ## 2025-11-14
 
