@@ -1,7 +1,7 @@
 import gymnasium as gym
 import gymnasium_robotics
 
-from gc_ope.env.utils.my_point_maze.register_env import register_my_point_maze
+from gc_ope.env.utils.my_maze.register_env import register_my_point_maze
 
 
 gym.register_envs(gymnasium_robotics)

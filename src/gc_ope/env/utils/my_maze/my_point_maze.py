@@ -75,7 +75,7 @@ class MyPointMazeEnv(PointMazeEnv):
 
         # Update the position of the target site for visualization
         self.update_target_site_pos()
-        
+
         # from reset() of PointMazeEnv
         self.point_env.init_qpos[:2] = self.reset_pos
 

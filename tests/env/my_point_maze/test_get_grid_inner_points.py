@@ -1,4 +1,4 @@
-from gc_ope.env.utils.my_point_maze.get_grid_inner_points import generate_grid_points
+from gc_ope.env.utils.my_maze.get_grid_inner_points import generate_grid_points
 
 
 # 测试函数

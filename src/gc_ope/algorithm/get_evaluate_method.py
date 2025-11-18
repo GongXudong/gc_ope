@@ -11,7 +11,7 @@ def get_evaluate_method(eval_cfg: DictConfig, env_cfg: DictConfig) -> Callable:
         return get_evaluate_method_for_flycraft(eval_cfg)
     elif env_cfg.env_id.startswith("MyReach"):
         return get_evaluate_method_for_my_reach(eval_cfg)
-    elif env_cfg.env_id.startswith("MyPointMaze"):
+    elif env_cfg.env_id.startswith("MyPointMaze") or env_cfg.env_id.startswith("MyAntMaze"):
         return get_evaluate_method_for_point_maze(eval_cfg)
     else:
         raise ValueError(f"Can not get evaluation method for env: {env_cfg.env_id}!")

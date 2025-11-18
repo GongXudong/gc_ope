@@ -15,7 +15,7 @@ from ray.util.multiprocessing import Pool
 from stable_baselines3 import PPO, SAC
 
 from gc_ope.env.get_env import get_pointmaze_env
-from gc_ope.env.utils.my_point_maze.get_grid_inner_points import generate_all_possible_dgs
+from gc_ope.env.utils.my_maze.get_grid_inner_points import generate_all_possible_dgs
 
 
 PROJECT_ROOT_DIR = Path(__file__).parent.parent

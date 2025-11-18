@@ -2,7 +2,7 @@
 
 ## Prepare python Environment
 
-如果需要运行Reach任务，需要保证pybullet正常安装。pybullet的安装依赖gcc，Linux系统上如果报编译相关错误，检查gcc是否正确安装
+To run the **Reach** task, ensure that **pybullet** is installed properly. The installation of pybullet depends on **gcc**. If compilation-related errors occur on Linux systems, check if gcc is installed correctly.
 
 ```bash
 sudo apt update

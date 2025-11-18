@@ -11,13 +11,14 @@ import gymnasium_robotics
 
 from gc_ope.env.utils.flycraft.vec_env_helper import get_vec_env as get_flycraft_vec_env
 from gc_ope.env.utils.my_reach.register_env import register_my_reach
-from gc_ope.env.utils.my_point_maze.register_env import register_my_point_maze
+from gc_ope.env.utils.my_maze.register_env import register_my_point_maze, register_my_ant_maze
 # from gc_ope.env.utils.pointmaze.vec_env_helper import make_env as make_pointmaze_env
 
 
 gym.register_envs(flycraft)
 register_my_reach(goal_range=0.3, distance_threshold=0.02, control_type="joints", max_episode_steps=100)
 register_my_point_maze()
+register_my_ant_maze()
 gym.register_envs(gymnasium_robotics)
 PROJECT_ROOT_DIR = Path(__file__).parent.parent.parent.parent
 
@@ -38,7 +39,7 @@ def get_vec_env(env_cfg: DictConfig) -> tuple[VecEnv, VecEnv, VecEnv]:
         return get_flycraft_envs(env_cfg)
     elif env_cfg.env_id.startswith("MyReach"):
         return get_my_reach_envs(env_cfg)
-    elif env_cfg.env_id.startswith("MyPointMaze"):
+    elif env_cfg.env_id.startswith("MyPointMaze") or env_cfg.env_id.startswith("MyAntMaze"):
         return get_my_pointmaze_envs(env_cfg)
     else:
         raise ValueError(f"Can not get vec_env for env: {env_cfg.env_id}!")
