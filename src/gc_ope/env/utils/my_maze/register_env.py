@@ -35,6 +35,28 @@ def register_my_ant_maze():
         id=f"MyAntMaze_Medium_Diverse_G-v3",
         entry_point=MyAntMazeEnv,
         kwargs={
+            "maze_map": maps.MEDIUM_MAZE_DIVERSE_G,
+            "reward_type": "sparse",
+            "continuing_task": False,
+        },
+        max_episode_steps=1000,
+    )
+
+    register(
+        id=f"MyAntMaze_Medium_Diverse_GDense-v3",
+        entry_point=MyAntMazeEnv,
+        kwargs={
+            "maze_map": maps.MEDIUM_MAZE_DIVERSE_G,
+            "reward_type": "dense",
+            "continuing_task": False,
+        },
+        max_episode_steps=1000,
+    )
+
+    register(
+        id=f"MyAntMaze_U_Diverse_G-v3",
+        entry_point=MyAntMazeEnv,
+        kwargs={
             "maze_map": maps.U_MAZE,
             "reward_type": "sparse",
             "continuing_task": False,
@@ -43,7 +65,7 @@ def register_my_ant_maze():
     )
 
     register(
-        id=f"MyAntMaze_Medium_Diverse_GDense-v3",
+        id=f"MyAntMaze_U_Diverse_GDense-v3",
         entry_point=MyAntMazeEnv,
         kwargs={
             "maze_map": maps.U_MAZE,
