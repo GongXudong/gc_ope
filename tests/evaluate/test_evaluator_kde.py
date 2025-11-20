@@ -73,8 +73,8 @@ def test_kde_evaluator(desired_goals, success_list, cumulative_reward_list, disc
 
         kde_evaluator.eval_res_container.add_batch(dgs, scs, crs, dcrs, ws)
 
-    normalized_dgs, dg_weights, dg_densities = kde_evaluator.fit_evaluator()
-    print(list(zip(normalized_dgs, dg_weights, dg_densities)))
+    dgs, normalized_dgs, dg_weights, dg_densities = kde_evaluator.fit_evaluator()
+    print(list(zip(dgs, normalized_dgs, dg_weights, dg_densities)))
 
     # evaluate
     tmp_dg_arr = np.array(desired_goals)

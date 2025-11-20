@@ -14,7 +14,7 @@
 
 ||FlyCraft (easy)|Reach|PointMaze|AntMaze|
 |:-:|:-:|:-:|:-:|:-:|
-|PPO|<input type="checkbox" checked>|<input type="checkbox" checked>|<input type="checkbox" checked>|<input type="checkbox">|
+|PPO|<input type="checkbox" checked>|<input type="checkbox" checked>|<input type="checkbox">|<input type="checkbox">|
 |SAC|<input type="checkbox" checked>|<input type="checkbox" checked>|<input type="checkbox" checked>|<input type="checkbox">|
 |HER|<input type="checkbox" checked>|<input type="checkbox" checked>|<input type="checkbox" checked>|<input type="checkbox">|
 |GCBC|<input type="checkbox">|<input type="checkbox">|<input type="checkbox">|<input type="checkbox">|
@@ -24,6 +24,6 @@
 ||FlyCraft (easy)|Reach|PointMaze|AntMaze|
 |:-:|:-:|:-:|:-:|:-:|
 |PPO|<input type="checkbox" checked>|<input type="checkbox" checked>|<input type="checkbox">|<input type="checkbox">|
-|SAC|<input type="checkbox" checked>|<input type="checkbox" checked>|<input type="checkbox">|<input type="checkbox">|
-|HER|<input type="checkbox" checked>|<input type="checkbox" checked>|<input type="checkbox">|<input type="checkbox">|
+|SAC|<input type="checkbox" checked>|<input type="checkbox" checked>|<input type="checkbox" checked>|<input type="checkbox">|
+|HER|<input type="checkbox" checked>|<input type="checkbox" checked>|<input type="checkbox" checked>|<input type="checkbox">|
 |GCBC|<input type="checkbox">|<input type="checkbox">|<input type="checkbox">|<input type="checkbox">|

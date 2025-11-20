@@ -24,11 +24,11 @@ class KDEEvaluator(EvaluatorBase):
             kernel=kde_kernel,
         )
 
-    def fit_evaluator(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def fit_evaluator(self) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """使用KDE拟合evaluation_result_container中正样本的分布
 
         Returns:
-            tuple[np.ndarray, np.ndarray, np.ndarray]: 正样本，正样本对应的权重，以及KDE拟合之后正样本对应的概率密度
+            tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: 正样本，缩放后的正样本，正样本对应的权重，以及KDE拟合之后正样本对应的概率密度
         """
 
         # 获取正样本
@@ -57,7 +57,7 @@ class KDEEvaluator(EvaluatorBase):
         log_densities = self.kde.score_samples(scaled_positive_samples)
         densities = np.exp(log_densities)
 
-        return scaled_positive_samples, sample_weights, densities
+        return positive_samples, scaled_positive_samples, sample_weights, densities
 
     def evaluate(self, desired_goals: np.ndarray, scale: bool=True) -> tuple[np.ndarray, np.ndarray]:
         # 数据标准化

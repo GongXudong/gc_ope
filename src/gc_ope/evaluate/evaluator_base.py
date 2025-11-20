@@ -23,11 +23,11 @@ class EvaluatorBase(ABC):
         self.scaler = StandardScaler()
 
     @abstractmethod
-    def fit_evaluator(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def fit_evaluator(self) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """拟合evaluation_result_container中正样本的分布    
 
         Returns:
-            tuple[np.ndarray, np.ndarray, np.ndarray]: 正样本，正样本对应的权重，以及KDE拟合之后正样本对应的概率密度
+            tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: 正样本，缩放后的正样本，正样本对应的权重，以及KDE拟合之后正样本对应的概率密度
         """
         pass
 
