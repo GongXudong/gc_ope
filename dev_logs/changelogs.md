@@ -1,8 +1,12 @@
 # GC-OPE
 
-## 2025-11-19
+## 2025-11-22
 
 * TODO: Add evaluation scripts on AntMaze.
+
+## 2025-11-21
+
+* Add $D(p_{ag}, \tilde{p}_{ag})$ evaluation scripts. 
 
 ## 2025-11-18
 
