@@ -121,7 +121,7 @@ def rollout(
     return res_dict
 
 
-@hydra.main(version_base=None, config_path="../configs/evaluate", config_name="config")
+@hydra.main(version_base=None, config_path="../../configs/evaluate", config_name="config")
 def evaluate_agent(cfg: DictConfig) -> None:
     
     # 1.确定需要测试的desired_goal集合

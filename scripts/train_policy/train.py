@@ -21,7 +21,7 @@ from gc_ope.algorithm.get_evaluate_method import get_evaluate_method
 PROJECT_ROOT_DIR = Path(__file__).parent.parent.parent
 
 
-@hydra.main(version_base=None, config_path="../configs/train", config_name="config")
+@hydra.main(version_base=None, config_path="../../configs/train", config_name="config")
 def train_agent(cfg: DictConfig) -> None:
 
     # 0.配置logger
