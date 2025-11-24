@@ -1,0 +1,20 @@
+env_id: MyAntMaze_U_Diverse_G-v3
+maze_map: [
+  [1, 1, 1, 1, 1],
+  [1, "r", "g", "g", 1],
+  [1, 1, 1, "g", 1],
+  [1, "g", "g", "g", 1],
+  [1, 1, 1, 1, 1],
+]
+reward_type: dense
+continuing_task: false
+train_env:  # 训练中的VecEnv配置
+  num_process: 32
+  seed: 3
+evaluation_env:  # 评估中的VecEnv配置
+  num_process: 16
+  seed: 6
+callback_env:  # Callback中的VecEnv配置
+  num_process: 16
+  seed: 7
+env_str: my_antmaze_u_dense
