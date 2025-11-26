@@ -9,7 +9,7 @@ from gc_ope.algorithm.utils.my_evaluate_policy import evaluate_policy_with_succe
 def get_evaluate_method(eval_cfg: DictConfig, env_cfg: DictConfig) -> Callable:
     if env_cfg.env_id.startswith("FlyCraft"):
         return get_evaluate_method_for_flycraft(eval_cfg)
-    elif env_cfg.env_id.startswith("MyReach"):
+    elif env_cfg.env_id.startswith("MyReach") or env_cfg.env_id.startswith("MyPush") or env_cfg.env_id.startswith("MySlide"):
         return get_evaluate_method_for_my_reach(eval_cfg)
     elif env_cfg.env_id.startswith("MyPointMaze") or env_cfg.env_id.startswith("MyAntMaze"):
         return get_evaluate_method_for_point_maze(eval_cfg)

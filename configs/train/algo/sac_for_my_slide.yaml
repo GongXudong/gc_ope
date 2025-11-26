@@ -1,0 +1,13 @@
+type: sac
+policy: MultiInputPolicy  # MultiInputPolicy, MlpPolicy, CnnPolicy
+seed: 2
+use_her: false
+buffer_size: 2e5
+learning_starts: 1000
+gradient_steps: 1
+learning_rate_decay: true
+learning_rate: 3e-4
+gamma: 0.95
+batch_size: 256
+net_arch: [256, 256]
+device: cuda

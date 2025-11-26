@@ -1,0 +1,2 @@
+eval_mode: success_rate  # success_rate, cumulative_return
+evaluate_nums_in_evaluation: 30
