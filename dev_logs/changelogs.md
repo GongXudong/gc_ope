@@ -3,6 +3,7 @@
 ## 2025-11-22
 
 * TODO: Add evaluation scripts on AntMaze.
+* TODO: Add Push(sparse), Slide(sparse).
 
 ## 2025-11-21
 
