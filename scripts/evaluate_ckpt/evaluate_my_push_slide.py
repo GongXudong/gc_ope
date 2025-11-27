@@ -140,8 +140,9 @@ def evaluate_agent(cfg: DictConfig) -> None:
         # 在desired_goal space内随机生成要测试的目标
         random_dgs = np.array(get_random_dgs(
             env=env,
-            num_dg=cfg.eval_cfg.eval_dg_num
+            num_dg=cfg.eval_cfg.eval_dg_num,
         ))
+
         evaluation_goals = pd.DataFrame({
             "x": random_dgs[:, 0],
             "y": random_dgs[:, 1],
@@ -150,12 +151,12 @@ def evaluate_agent(cfg: DictConfig) -> None:
     elif cfg.eval_cfg.dg_gen_method == "fixed":
 
         # 在desired_goal space内以固定间隔生成要测试的目标
-        all_dgs = get_all_possible_dgs(
+        all_dgs = np.array(get_all_possible_dgs(
             env=env,
             step_x=cfg.eval_cfg.x_interval,
             step_y=cfg.eval_cfg.y_interval,
             step_z=cfg.eval_cfg.z_interval,
-        )
+        ))
 
         evaluation_goals = pd.DataFrame({
             "x": all_dgs[:, 0],

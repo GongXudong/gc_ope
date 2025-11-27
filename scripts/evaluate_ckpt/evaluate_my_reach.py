@@ -15,6 +15,7 @@ from ray.util.multiprocessing import Pool
 from stable_baselines3 import PPO, SAC
 
 from gc_ope.env.get_env import get_gym_env
+from gc_ope.env.utils.my_reach.get_all_possible_dgs import get_all_possible_dgs, get_random_dgs
 
 
 PROJECT_ROOT_DIR = Path(__file__).parent.parent.parent
@@ -129,38 +130,35 @@ def evaluate_agent(cfg: DictConfig) -> None:
     env = get_gym_env(
         env_id=cfg.env.env_id,
     )
-
-    x_min = env.unwrapped.task.goal_range_low[0]
-    x_max = env.unwrapped.task.goal_range_high[0]
-    y_min = env.unwrapped.task.goal_range_low[1]
-    y_max = env.unwrapped.task.goal_range_high[1]
-    z_min = env.unwrapped.task.goal_range_low[2]
-    z_max = env.unwrapped.task.goal_range_high[2]
-
-    EPS = 1e-6
     
     # 1.2 根据配置文件指定的方法生成desired_goal集合
     if cfg.eval_cfg.dg_gen_method == "random":
 
         # 在desired_goal space内随机生成要测试的目标
+        random_dgs = np.array(get_random_dgs(
+            env=env,
+            num_dg=cfg.eval_cfg.eval_dg_num,
+        ))
+
         evaluation_goals = pd.DataFrame({
-            "x": [np.random.random() * (x_max - x_min) + x_min for i in range(cfg.eval_cfg.eval_dg_num)],
-            "y": [np.random.random() * (y_max - y_min) + y_min for i in range(cfg.eval_cfg.eval_dg_num)],
-            "z": [np.random.random() * (z_max - z_min) + z_min for i in range(cfg.eval_cfg.eval_dg_num)],
+            "x": random_dgs[:, 0],
+            "y": random_dgs[:, 1],
+            "z": random_dgs[:, 2],
         })
     elif cfg.eval_cfg.dg_gen_method == "fixed":
 
         # 在desired_goal space内以固定间隔生成要测试的目标
-        x_list = np.arange(start=x_min, stop=x_max+EPS, step=cfg.eval_cfg.x_interval)
-        y_list = np.arange(start=y_min, stop=y_max+EPS, step=cfg.eval_cfg.y_interval)
-        z_list = np.arange(start=z_min, stop=z_max+EPS, step=cfg.eval_cfg.z_interval)
-
-        combinations = np.array(list(itertools.product(x_list, y_list, z_list)))
+        all_dgs = np.array(get_all_possible_dgs(
+            env=env,
+            step_x=cfg.eval_cfg.x_interval,
+            step_y=cfg.eval_cfg.y_interval,
+            step_z=cfg.eval_cfg.z_interval,
+        ))
         
         evaluation_goals = pd.DataFrame({
-            "x": combinations[:, 0],
-            "y": combinations[:, 1],
-            "z": combinations[:, 2],
+            "x": all_dgs[:, 0],
+            "y": all_dgs[:, 1],
+            "z": all_dgs[:, 2],
         })
     else:
         raise ValueError(f"Config Value Error: the value of 'dg_gen_method' must be one of: randomm, fixed!")
