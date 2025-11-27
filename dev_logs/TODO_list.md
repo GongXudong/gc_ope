@@ -17,18 +17,18 @@
 
 ### 2.1 训练
 
-||FlyCraft (easy)|Reach|PointMaze|AntMaze|
-|:-:|:-:|:-:|:-:|:-:|
-|PPO|<input type="checkbox" checked>|<input type="checkbox" checked>|<input type="checkbox" checked>|<input type="checkbox">|
-|SAC|<input type="checkbox" checked>|<input type="checkbox" checked>|<input type="checkbox" checked>|<input type="checkbox">|
-|HER|<input type="checkbox" checked>|<input type="checkbox" checked>|<input type="checkbox" checked>|<input type="checkbox">|
-|GCBC|<input type="checkbox">|<input type="checkbox">|<input type="checkbox">|<input type="checkbox">|
+||FlyCraft (easy)|Reach|Push|Slide|PointMaze|AntMaze|
+|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+|PPO|<input type="checkbox" checked>|<input type="checkbox" checked>|<input type="checkbox" checked>|<input type="checkbox" checked>|<input type="checkbox" checked>|<input type="checkbox">|
+|SAC|<input type="checkbox" checked>|<input type="checkbox" checked>|<input type="checkbox" checked>|<input type="checkbox" checked>|<input type="checkbox" checked>|<input type="checkbox">|
+|HER|<input type="checkbox" checked>|<input type="checkbox" checked>|<input type="checkbox" checked>|<input type="checkbox" checked>|<input type="checkbox" checked>|<input type="checkbox">|
+|GCBC|<input type="checkbox">|<input type="checkbox">|<input type="checkbox">|<input type="checkbox">|<input type="checkbox">|<input type="checkbox">|
 
 ### 2.2 评估
 
-||FlyCraft (easy)|Reach|PointMaze|AntMaze|
-|:-:|:-:|:-:|:-:|:-:|
-|PPO|<input type="checkbox" checked>|<input type="checkbox" checked>|<input type="checkbox" checked>|<input type="checkbox">|
-|SAC|<input type="checkbox" checked>|<input type="checkbox" checked>|<input type="checkbox" checked>|<input type="checkbox">|
-|HER|<input type="checkbox" checked>|<input type="checkbox" checked>|<input type="checkbox" checked>|<input type="checkbox">|
-|GCBC|<input type="checkbox">|<input type="checkbox">|<input type="checkbox">|<input type="checkbox">|
+||FlyCraft (easy)|Reach|Push|Slide|PointMaze|AntMaze|
+|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+|PPO|<input type="checkbox" checked>|<input type="checkbox" checked>|<input type="checkbox">|<input type="checkbox">|<input type="checkbox" checked>|<input type="checkbox">|
+|SAC|<input type="checkbox" checked>|<input type="checkbox" checked>|<input type="checkbox">|<input type="checkbox">|<input type="checkbox" checked>|<input type="checkbox">|
+|HER|<input type="checkbox" checked>|<input type="checkbox" checked>|<input type="checkbox">|<input type="checkbox">|<input type="checkbox" checked>|<input type="checkbox">|
+|GCBC|<input type="checkbox">|<input type="checkbox">|<input type="checkbox">|<input type="checkbox">|<input type="checkbox">|<input type="checkbox">|

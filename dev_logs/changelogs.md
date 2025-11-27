@@ -1,9 +1,18 @@
 # GC-OPE
 
-## 2025-11-22
+TODO: Add MEGA training.
 
-* TODO: Add evaluation scripts on AntMaze.
-* TODO: Add Push(sparse), Slide(sparse).
+## 2025-11-27
+
+* Add evaluation scripts on Push(sparse), Slide(sparse).
+
+## 2025-11-26
+
+* Add training scripts on Push(sparse), Slide(sparse).
+
+## 2025-11-25
+
+* Add evaluation scripts on AntMaze.
 
 ## 2025-11-21
 
