@@ -1,6 +1,7 @@
 # GC-OPE
 
 TODO: Add MEGA training.
+TODO: sampling data compatible with scope-rl.
 
 ## 2025-11-27
 

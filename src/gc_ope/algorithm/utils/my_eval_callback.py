@@ -283,17 +283,12 @@ class MyEvalCallbackSTAT(EventCallback):
         log_path: Optional[str] = None,
         best_model_save_path: Optional[str] = None,
         deterministic: bool = True,
+        success_key_in_info: str = "is_success",
         render: bool = False,
         verbose: int = 1,
         warn: bool = True,
-        sync_stat_success_dict: bool = True,
-        sync_success_dict_env_method_name: str = "set_success_goal_cnt_dict",
-        stat_success_dict: dict = {},
-        stat_success_annealing_coef: float = 1.0,
-        sync_stat_fail_dict: bool = True,
-        sync_fail_dict_env_method_name: str = "set_fail_goal_cnt_dict",
-        stat_fail_dict: dict = {},
-        stat_fail_annealing_coef: float = 1.0,
+        sync_success_stat: bool = True,
+        sync_success_stat_env_method_name: str = "sync_evaluation_stat",
         training_envs: SubprocVecEnv = None
     ):
         super().__init__(callback_after_eval, verbose=verbose)
@@ -311,6 +306,7 @@ class MyEvalCallbackSTAT(EventCallback):
         self.best_success_rate = 0.
 
         self.deterministic = deterministic
+        self.success_key_in_info = success_key_in_info
         self.render = render
         self.warn = warn
 
@@ -331,15 +327,8 @@ class MyEvalCallbackSTAT(EventCallback):
         self._is_success_buffer = []
         self.evaluations_successes = []
 
-        self.sync_stat_success_dict = sync_stat_success_dict
-        self.sync_success_dict_env_method_name = sync_success_dict_env_method_name
-        self.stat_success_dict = stat_success_dict
-        self.stat_success_annealing_coef = stat_success_annealing_coef
-
-        self.sync_stat_fail_dict = sync_stat_fail_dict
-        self.sync_fail_dict_env_method_name = sync_fail_dict_env_method_name
-        self.stat_fail_dict = stat_fail_dict
-        self.stat_fail_annealing_coef = stat_fail_annealing_coef
+        self.sync_success_stat = sync_success_stat
+        self.sync_success_stat_env_method_name = sync_success_stat_env_method_name
 
         self.training_envs: SubprocVecEnv = training_envs
 
@@ -370,7 +359,7 @@ class MyEvalCallbackSTAT(EventCallback):
         info = locals_["info"]
 
         if locals_["done"]:
-            maybe_is_success = info.get("is_success")
+            maybe_is_success = info.get(self.success_key_in_info)
             if maybe_is_success is not None:
                 self._is_success_buffer.append(maybe_is_success)
 
@@ -398,40 +387,26 @@ class MyEvalCallbackSTAT(EventCallback):
                 n_eval_episodes=self.n_eval_episodes,
                 render=self.render,
                 deterministic=self.deterministic,
+                success_key_in_info=self.success_key_in_info,
                 return_episode_rewards=True,
                 warn=self.warn,
                 callback=self._log_success_callback,
             )
-            
-            # 先衰减
-            if self.stat_success_annealing_coef != 1.0:
-                for item in self.stat_success_dict.keys():
-                    self.stat_success_dict[item] = self.stat_success_annealing_coef * self.stat_success_dict[item]
-            if self.stat_fail_annealing_coef != 1.0:
-                for item in self.stat_fail_dict.keys():
-                    self.stat_fail_dict[item] = self.stat_fail_annealing_coef * self.stat_fail_dict[item]
+
+            tmp_success_stat_list = []
 
             for item in stat_dict_arr:
-                tmp_info = item["last_info"]
-                tmp_target_v = int(tmp_info["target_v"])
-                tmp_target_mu = int(tmp_info["target_mu"])
-                tmp_target_chi = int(tmp_info["target_chi"])
-                tmp_goal_str = f"{tmp_target_v}_{tmp_target_mu}_{tmp_target_chi}"
-
-                if tmp_info["is_success"]:
-                    self.stat_success_dict[tmp_goal_str] = self.stat_success_dict.get(tmp_goal_str, 0) + 1
-                    print(f"In callback: success, {tmp_goal_str}, cnt: {self.stat_success_dict.get(tmp_goal_str)}")
-                else:
-                    self.stat_fail_dict[tmp_goal_str] = self.stat_fail_dict.get(tmp_goal_str, 0) + 1
-                    print(f"In callback: fail, {tmp_goal_str}, cnt: {self.stat_fail_dict.get(tmp_goal_str)}")
+                tmp_success_stat_list.append({
+                    "goal": item["desired_goal"],
+                    "success": True if item["success"] else False,
+                })
 
             # 把统计结果同步到训练环境中
             # print("synchronize attributes!!!!!!!!!!!!!!!!")
             # print(sum(list(self.stat_success_dict.values())), sum(list(self.stat_fail_dict.values())))
-            if self.sync_stat_success_dict:
-                self.training_envs.env_method(self.sync_success_dict_env_method_name, self.stat_success_dict)
-            if self.sync_stat_fail_dict:
-                self.training_envs.env_method(self.sync_fail_dict_env_method_name, self.stat_fail_dict)
+            if self.sync_success_stat:
+                # self.training_envs.env_is_wrapped
+                self.training_envs.env_method(self.sync_success_stat_env_method_name, tmp_success_stat_list)
 
             # print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
             # print(self.stat_success_dict)

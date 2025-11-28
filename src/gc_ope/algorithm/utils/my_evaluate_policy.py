@@ -192,6 +192,14 @@ def evaluate_policy_with_stat(
     """
     stat_dict_arr = []
 
+    if isinstance(env, gym.Env):
+        env_id = env.unwrapped.spec.id
+    elif isinstance(env, VecEnv):
+        env_id = env.get_attr("spec")[0]["id"]
+    
+    print(env_id)
+    exit()
+
     is_monitor_wrapped = False
     # Avoid circular import
     from stable_baselines3.common.monitor import Monitor
@@ -264,6 +272,7 @@ def evaluate_policy_with_stat(
                     
                     # 记录该成功的轨迹
                     stat_dict_arr.append({
+                        "success": infos[i][success_key_in_info],
                         "last_info": deepcopy(infos[i]),
                         "cumulative_reward": current_rewards[i],
                         "episode_length": current_lengths[i]

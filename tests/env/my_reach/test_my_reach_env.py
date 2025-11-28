@@ -11,6 +11,8 @@ def test_my_reach_init():
 
     assert env.unwrapped.task.distance_threshold == 0.01
 
+    print(env.unwrapped.spec.id)
+
 def test_my_reach_init_2():
 
     # def func():
@@ -21,3 +23,7 @@ def test_my_reach_init_2():
     env = gym.make("MyReachSparse-v0")
 
     assert env.unwrapped.task.distance_threshold == 0.01
+
+if __name__ == "__main__":
+    test_my_reach_init()
+    test_my_reach_init_2()
