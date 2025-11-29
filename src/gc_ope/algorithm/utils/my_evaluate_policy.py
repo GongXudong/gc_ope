@@ -3,9 +3,9 @@ import numpy as np
 from copy import deepcopy
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import warnings
-
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecCheckNan, VecEnv, VecMonitor, is_vecenv_wrapped
 from stable_baselines3.common import type_aliases
+from gc_ope.env.utils.flycraft.my_wrappers import ScaledObservationWrapper
 
 
 def evaluate_policy_with_success_rate(
@@ -192,13 +192,15 @@ def evaluate_policy_with_stat(
     """
     stat_dict_arr = []
 
+    # 获取环境id，用于后续判断如何从info中获取success信息
     if isinstance(env, gym.Env):
         env_id = env.unwrapped.spec.id
     elif isinstance(env, VecEnv):
-        env_id = env.get_attr("spec")[0]["id"]
-    
-    print(env_id)
-    exit()
+        tmp = env.get_attr("spec", indices=[0])[0]
+        if tmp is not None:
+            env_id = tmp.id
+        else:
+            env_id = env.env_method("__str__", indices=[0])[0]
 
     is_monitor_wrapped = False
     # Avoid circular import
@@ -270,13 +272,46 @@ def evaluate_policy_with_stat(
                         episode_lengths.append(current_lengths[i])
                         episode_counts[i] += 1
                     
-                    # 记录该成功的轨迹
-                    stat_dict_arr.append({
-                        "success": infos[i][success_key_in_info],
-                        "last_info": deepcopy(infos[i]),
-                        "cumulative_reward": current_rewards[i],
-                        "episode_length": current_lengths[i]
-                    })
+                    # 记录评估信息，不同环境获取信息的方式略有差别，需要结合env_id判断环境类型
+                    if env_id.find("FlyCraft") != -1:
+                        if env.env_is_wrapped(ScaledObservationWrapper, indices=[0])[0]:
+                            original_obs = env.env_method(
+                                "inverse_scale_state", 
+                                indices=[i],
+                                state_var={
+                                    "desired_goal": deepcopy(infos[i]["terminal_observation"]["desired_goal"]),
+                                    "achieved_goal": deepcopy(infos[i]["terminal_observation"]["achieved_goal"]),
+                                    "observation": deepcopy(infos[i]["terminal_observation"]["observation"])
+                                },
+                            )[0]
+                        else:
+                            original_obs = infos[i]["terminal_observation"]
+
+                        # stable-baselines3的SubprocVecEnv在info中额外存储了两个信息：
+                        # 1.terminal_observation，只有done为True的时候在info中存储该信息；
+                        # 2.TimeLimit.truncated，每一步都在info中存储，表示是否触发truncated。
+
+                        # 记录该成功的轨迹
+                        stat_dict_arr.append({
+                            "desired_goal": original_obs["desired_goal"],
+                            "achieved_goal": original_obs["achieved_goal"],
+                            "success": infos[i][success_key_in_info],
+                            "last_info": deepcopy(infos[i]),
+                            "cumulative_reward": current_rewards[i],
+                            "episode_length": current_lengths[i],
+                        })
+
+                    elif env_id.startswith("MyReach") or env_id.startswith("MyPush") or env_id.startswith("MySlide") or env_id.startswith("MyPointMaze") or env_id.startswith("MyAntMaze"):
+                        stat_dict_arr.append({
+                            "desired_goal": infos[i]["terminal_observation"]["desired_goal"],
+                            "achieved_goal": infos[i]["terminal_observation"]["achieved_goal"],
+                            "success": infos[i][success_key_in_info],
+                            "last_info": deepcopy(infos[i]),
+                            "cumulative_reward": current_rewards[i],
+                            "episode_length": current_lengths[i],
+                        })
+                    else:
+                        raise ValueError(f"In evaluate_policy_with_stat(), can not process env_id: {env_id}!")
 
                     current_rewards[i] = 0
                     current_lengths[i] = 0

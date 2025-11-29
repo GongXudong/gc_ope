@@ -3,7 +3,7 @@ config_file: configs/env_configs/flycraft/env_config_for_sac_easy.json
 train_env:  # 训练中的VecEnv配置
   num_process: 1
   seed: 3
-  custom_config: 
+  custom_config:
     debug_mode: true
     flag_str: Train
 evaluation_env:  # 评估中的VecEnv配置
