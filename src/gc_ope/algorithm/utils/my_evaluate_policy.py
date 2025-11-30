@@ -200,6 +200,7 @@ def evaluate_policy_with_stat(
         if tmp is not None:
             env_id = tmp.id
         else:
+            # 如果环境没有spec，则获取环境的类名
             env_id = env.env_method("__str__", indices=[0])[0]
 
     is_monitor_wrapped = False
@@ -281,7 +282,7 @@ def evaluate_policy_with_stat(
                                 state_var={
                                     "desired_goal": deepcopy(infos[i]["terminal_observation"]["desired_goal"]),
                                     "achieved_goal": deepcopy(infos[i]["terminal_observation"]["achieved_goal"]),
-                                    "observation": deepcopy(infos[i]["terminal_observation"]["observation"])
+                                    "observation": deepcopy(infos[i]["terminal_observation"]["observation"]),
                                 },
                             )[0]
                         else:
@@ -296,7 +297,7 @@ def evaluate_policy_with_stat(
                             "desired_goal": original_obs["desired_goal"],
                             "achieved_goal": original_obs["achieved_goal"],
                             "success": infos[i][success_key_in_info],
-                            "last_info": deepcopy(infos[i]),
+                            # "last_info": deepcopy(infos[i]),
                             "cumulative_reward": current_rewards[i],
                             "episode_length": current_lengths[i],
                         })
@@ -306,7 +307,7 @@ def evaluate_policy_with_stat(
                             "desired_goal": infos[i]["terminal_observation"]["desired_goal"],
                             "achieved_goal": infos[i]["terminal_observation"]["achieved_goal"],
                             "success": infos[i][success_key_in_info],
-                            "last_info": deepcopy(infos[i]),
+                            # "last_info": deepcopy(infos[i]),
                             "cumulative_reward": current_rewards[i],
                             "episode_length": current_lengths[i],
                         })

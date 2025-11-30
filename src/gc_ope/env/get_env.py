@@ -20,6 +20,7 @@ register_my_push(control_type="joints", goal_xy_range=0.5, obj_xy_range=0.0, dis
 register_my_slide(control_type="joints", goal_xy_range=0.5, goal_x_offset=0.4, obj_xy_range=0.0, distance_threshold=0.05, max_episode_steps=50)
 register_my_point_maze()
 register_my_ant_maze()
+
 PROJECT_ROOT_DIR = Path(__file__).parent.parent.parent.parent
 
 

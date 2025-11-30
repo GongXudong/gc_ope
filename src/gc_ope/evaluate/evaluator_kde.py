@@ -25,7 +25,9 @@ class KDEEvaluator(EvaluatorBase):
         )
 
     def fit_evaluator(self) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        """使用KDE拟合evaluation_result_container中正样本的分布
+        """使用KDE拟合evaluation_result_container中正样本的分布。
+
+        注意：每一次调用 KernelDensity.fit() 方法，都是一次全新的、独立的训练过程。它会完全覆盖模型之前学到的所有信息，只基于当前传入的数据集来重新构建模型。
 
         Returns:
             tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: 正样本，缩放后的正样本，正样本对应的权重，以及KDE拟合之后正样本对应的概率密度

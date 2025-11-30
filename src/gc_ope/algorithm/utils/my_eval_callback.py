@@ -393,12 +393,13 @@ class MyEvalCallbackSTAT(EventCallback):
                 callback=self._log_success_callback,
             )
 
-            tmp_success_stat_list = []
+            tmp_stat_list = []
 
             for item in stat_dict_arr:
-                tmp_success_stat_list.append({
-                    "goal": item["desired_goal"],
+                tmp_stat_list.append({
+                    "desired_goal": item["desired_goal"],
                     "success": True if item["success"] else False,
+                    "cumulative_reward": item["cumulative_reward"],
                 })
 
             # 把统计结果同步到训练环境中
@@ -406,7 +407,7 @@ class MyEvalCallbackSTAT(EventCallback):
             # print(sum(list(self.stat_success_dict.values())), sum(list(self.stat_fail_dict.values())))
             if self.sync_success_stat:
                 # self.training_envs.env_is_wrapped
-                self.training_envs.env_method(self.sync_success_stat_env_method_name, tmp_success_stat_list)
+                self.training_envs.env_method(self.sync_success_stat_env_method_name, tmp_stat_list)
 
             # print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
             # print(self.stat_success_dict)

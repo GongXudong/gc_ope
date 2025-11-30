@@ -1,4 +1,5 @@
 from pathlib import Path
+import numpy as np
 from stable_baselines3 import PPO, SAC
 from omegaconf import DictConfig
 from gc_ope.env.get_vec_env import get_vec_env
@@ -171,7 +172,32 @@ def test_my_evaluate_policy_stat_with_flycraft():
         success_key_in_info="is_success",
     )
 
-    print(mean_return, std_return, mean_success, stat_dict_arr)
+    print(f"return = {mean_return} +- {std_return}, success rate = {mean_success}")
+
+    # 校验：
+    # （1）stat_dict_arr中success为True的数量与mean_success相同；
+    # （2）desired_goal与achieved_goal之间的距离符合成功标准。
+
+    true_list_from_stat_dict_arr = [stat_dict["success"] for stat_dict in stat_dict_arr]
+
+    assert np.allclose(mean_success, np.mean(true_list_from_stat_dict_arr))
+
+    from flycraft.utils import geometry_utils
+
+    for stat in stat_dict_arr:
+
+        print(stat)
+
+        if stat["success"]:
+            cur_error = geometry_utils.angle_of_2_velocity(
+                v_1=stat["desired_goal"][0],
+                mu_1=stat["desired_goal"][1],
+                chi_1=stat["desired_goal"][2],
+                v_2=stat["achieved_goal"][0],
+                mu_2=stat["achieved_goal"][1],
+                chi_2=stat["achieved_goal"][2],
+            )
+            assert cur_error < 3.0
 
 
 if __name__ == "__main__":

@@ -24,6 +24,7 @@ register_my_slide(control_type="joints", goal_xy_range=0.5, goal_x_offset=0.4, o
 register_my_point_maze()
 register_my_ant_maze()
 gym.register_envs(gymnasium_robotics)
+
 PROJECT_ROOT_DIR = Path(__file__).parent.parent.parent.parent
 
 
@@ -123,7 +124,7 @@ def get_my_reach_envs(env_cfg: DictConfig) -> tuple[VecEnv, VecEnv, VecEnv]:
     return vec_env, eval_env, eval_env_in_callback
 
 def get_my_pointmaze_envs(env_cfg: DictConfig) -> tuple[VecEnv, VecEnv, VecEnv]:
-    
+
     # 训练使用的环境
     vec_env = make_vec_env(
         env_id=env_cfg.env_id,
