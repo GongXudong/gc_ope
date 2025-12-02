@@ -1,4 +1,4 @@
-from gc_ope.env.utils.my_maze.get_grid_inner_points import generate_grid_points
+from gc_ope.env.utils.my_maze.desired_goal_utils import generate_grid_points
 
 
 # 测试函数
@@ -36,7 +36,7 @@ def test_grid_points():
         (0, 0, 4, 3),
         (2, 3, 6, 3)
     ]
-    
+
     for cx, cy, size, grid_n in test_cases:
         points = generate_grid_points(cx, cy, size, grid_n)
         print(f"中心({cx},{cy}), 边长{size}, {grid_n}x{grid_n}网格:")

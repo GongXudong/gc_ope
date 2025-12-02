@@ -15,7 +15,7 @@ from ray.util.multiprocessing import Pool
 from stable_baselines3 import PPO, SAC
 
 from gc_ope.env.get_env import get_gym_env
-from gc_ope.env.utils.my_push.get_all_possible_dgs import get_all_possible_dgs, get_random_dgs
+from gc_ope.env.utils.my_push.desired_goal_utils import get_all_possible_dgs, get_random_dgs
 
 
 PROJECT_ROOT_DIR = Path(__file__).parent.parent.parent

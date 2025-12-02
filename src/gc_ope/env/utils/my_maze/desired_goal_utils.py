@@ -1,10 +1,24 @@
+from typing import Union, Any
 import numpy as np
 import gymnasium as gym
-import gymnasium_robotics
+from gymnasium.core import ObsType
 from gymnasium_robotics.envs.maze.point_maze import MazeEnv
+from gc_ope.env.utils.my_maze.my_point_maze import MyPointMazeEnv
+from gc_ope.env.utils.my_maze.my_ant_maze import MyAntMazeEnv
 
 
-gym.register_envs(gymnasium_robotics)
+def sample_a_desired_goal(env: Union[MyPointMazeEnv, MyAntMazeEnv, gym.Wrapper]) -> np.ndarray:
+    """根据环境原有的采样目标方法，采样一个desired_goal
+
+    Args:
+        env (Union[MyPointMazeEnv, MyAntMazeEnv, gym.Wrapper]): 环境
+
+    Returns:
+        np.ndarray: desired_goal
+    """
+    tmp_dg = env.unwrapped.generate_target_goal()
+    dg = env.unwrapped.add_xy_position_noise(tmp_dg)
+    return dg
 
 
 def generate_grid_points(center_x: float, center_y: float, maze_size_scaling: float, n: int) -> list[tuple]:
@@ -55,6 +69,7 @@ def generate_grid_points(center_x: float, center_y: float, maze_size_scaling: fl
 
     return points
 
+
 def generate_all_possible_dgs(env: MazeEnv, n: int) -> list[tuple]:
     """对于MazeEnv中的所有标记为可生成goal的格子，在格子内等间隔生成n*n个goal。
     """
@@ -67,3 +82,32 @@ def generate_all_possible_dgs(env: MazeEnv, n: int) -> list[tuple]:
         dg_list.extend(tmp_dg_list)
 
     return dg_list
+
+
+def reset_env_with_desired_goal(env: Union[MyPointMazeEnv, MyAntMazeEnv, gym.Wrapper], desired_goal: np.ndarray)  -> tuple[ObsType, dict[str, Any]]:
+    """按指定的desired_goal初始化环境。
+
+    Args:
+        env (Union[MyPointMazeEnv, MyAntMazeEnv, gym.Wrapper]): 环境
+        desired_goal (np.ndarray): 期望目标
+
+    Returns:
+        tuple[ObsType, dict[str, Any]]: 按期望目标重置环境后的观测、辅助信息
+    """
+    obs, info = env.reset()
+        
+    env.unwrapped.goal = desired_goal.copy()
+
+    if hasattr(env.unwrapped, "point_env"):
+        tmp_obs, tmp_info = env.unwrapped.point_env.reset()
+    elif hasattr(env.unwrapped, "ant_env"):
+        tmp_obs, tmp_info = env.unwrapped.ant_env.reset()
+    else:
+        raise ValueError(f"This method is only applicable to AntMaze and PointMaze.")
+
+    obs_dict = env.unwrapped._get_obs(tmp_obs)
+    tmp_info["success"] = bool(
+        np.linalg.norm(obs_dict["achieved_goal"] - env.unwrapped.goal) <= 0.45
+    )
+
+    return obs_dict, tmp_info
