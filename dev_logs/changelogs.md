@@ -3,6 +3,10 @@
 TODO: Add MEGA training.
 TODO: sampling data compatible with scope-rl.
 
+## 2025-12-02
+
+* Add desired_goal_utils for all envs.
+
 ## 2025-11-27
 
 * Add evaluation scripts on Push(sparse), Slide(sparse).

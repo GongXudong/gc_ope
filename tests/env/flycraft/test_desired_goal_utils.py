@@ -1,10 +1,13 @@
 from pathlib import Path
+from typing import Literal
 import numpy as np
+import pytest
 import gymnasium as gym
 import flycraft
 from stable_baselines3.common.env_util import unwrap_wrapper
 from gc_ope.env.get_env import get_env
-from gc_ope.env.utils.flycraft.desired_goal_utils import sample_a_desired_goal, reset_env_with_desired_goal
+from gc_ope.env.utils.flycraft import desired_goal_utils as flycraft_desired_goal_utils
+from gc_ope.env.utils import desired_goal_utils as common_desired_goal_utils
 from gc_ope.utils.load_config_with_hydra import load_config
 from gc_ope.env.utils.flycraft.my_wrappers import ScaledObservationWrapper
 
@@ -12,20 +15,33 @@ from gc_ope.env.utils.flycraft.my_wrappers import ScaledObservationWrapper
 gym.register_envs(flycraft)
 PROJECT_ROOT_DIR = Path(__file__).parent.parent.parent.parent
 
-def test_sample_a_desired_goal_1():
+
+@pytest.mark.parametrize(
+    "test_pkg",
+    [("flycraft"), ("common")],
+)
+def test_sample_a_desired_goal_1(test_pkg):
     env = gym.make("FlyCraft-v0")
+    print(env)
 
     dg_min = env.unwrapped.task.get_goal_lower_bounds()
     dg_max = env.unwrapped.task.get_goal_higher_bounds()
 
     for i in range(100):
-        dg = sample_a_desired_goal(env)
+        if test_pkg == "flycraft":
+            dg = flycraft_desired_goal_utils.sample_a_desired_goal(env)
+        else:
+            dg = common_desired_goal_utils.sample_a_desired_goal(env)
 
         assert dg_min[0] <= dg[0] <= dg_max[0]
         assert dg_min[1] <= dg[1] <= dg_max[1]
         assert dg_min[2] <= dg[2] <= dg_max[2]
-        
-def test_sample_a_desired_goal_2():
+
+@pytest.mark.parametrize(
+    "test_pkg",
+    [("flycraft"), ("common")],
+)
+def test_sample_a_desired_goal_2(test_pkg: Literal["flycraft", "common"]):
     cfg = load_config(
         config_path="../../../configs/train",
         config_name="config",
@@ -39,13 +55,20 @@ def test_sample_a_desired_goal_2():
     dg_max = env.unwrapped.task.get_goal_higher_bounds()
 
     for i in range(100):
-        dg = sample_a_desired_goal(env)
+        if test_pkg == "flycraft":
+            dg = flycraft_desired_goal_utils.sample_a_desired_goal(env)
+        else:
+            dg = common_desired_goal_utils.sample_a_desired_goal(env)
 
         assert dg_min[0] <= dg[0] <= dg_max[0]
         assert dg_min[1] <= dg[1] <= dg_max[1]
         assert dg_min[2] <= dg[2] <= dg_max[2]
 
-def test_reset_env_with_desired_goal():
+@pytest.mark.parametrize(
+    "test_pkg",
+    [("flycraft"), ("common")],
+)
+def test_reset_env_with_desired_goal(test_pkg: Literal["flycraft", "common"]):
     cfg = load_config(
         config_path="../../../configs/train",
         config_name="config",
@@ -58,12 +81,17 @@ def test_reset_env_with_desired_goal():
     env = get_env(cfg.env)
     scaled_obs_wrapper_env = unwrap_wrapper(env, ScaledObservationWrapper)
 
-
-    dg_list = [sample_a_desired_goal(env) for i in range(100)]
+    if test_pkg == "flycraft":
+        dg_list = [flycraft_desired_goal_utils.sample_a_desired_goal(env) for i in range(100)]
+    else:
+        dg_list = [common_desired_goal_utils.sample_a_desired_goal(env) for i in range(100)]
 
     for dg in dg_list:
-        obs, info = reset_env_with_desired_goal(env, dg)
-        
+        if test_pkg == "flycraft":
+            obs, info = flycraft_desired_goal_utils.reset_env_with_desired_goal(env, dg)
+        else:
+            obs, info = common_desired_goal_utils.reset_env_with_desired_goal(env, dg)
+
         if scaled_obs_wrapper_env is not None:
             # assert np.allclose(scaled_obs_wrapper_env.inverse_scale_state(obs)["desired_goal"], dg, atol=EPS)
             assert np.allclose(obs["desired_goal"], scaled_obs_wrapper_env.goal_scalar.transform(dg.reshape((1,-1))).reshape((-1)), atol=EPS)
@@ -81,6 +109,6 @@ def test_reset_env_with_desired_goal():
                 assert np.allclose(next_obs["desired_goal"], dg, atol=EPS)
 
 if __name__ == "__main__":
-    test_sample_a_desired_goal_1()
-    test_sample_a_desired_goal_2()
-    test_reset_env_with_desired_goal()
+    test_sample_a_desired_goal_1("common")
+    test_sample_a_desired_goal_2("common")
+    test_reset_env_with_desired_goal("common")
