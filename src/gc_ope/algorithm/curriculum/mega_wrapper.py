@@ -43,7 +43,7 @@ class MEGAWrapper(Wrapper):
         """接收最新评估数据，加入到kde_estimator的eval_res_container中
 
         Args:
-            evaluation_stat (List[Dict]): 其中的item为dict，形如{"goal": xx, "weight": 1.}
+            evaluation_stat (List[Dict]): 其中的item为dict，形如{"desired_goal": xx, "success": True, "cumulative_reward": 3.0}
         """
 
         # print(f"sync evaluation statistic: {evaluation_stat}")
@@ -75,7 +75,7 @@ class MEGAWrapper(Wrapper):
         
         if sum(self.kde_estimator.eval_res_container.success_list) == 0:
             # 如果测试数据中还没有成功的目标，意味着没有拟合KDE的数据，此时使用环境原本的方法采样desired_goal
-            
+
             desired_goal = desired_goal_utils.sample_a_desired_goal(self.env)
 
             print(f"sample from random: {desired_goal}")
@@ -88,15 +88,15 @@ class MEGAWrapper(Wrapper):
             candidate_goals = [desired_goal_utils.sample_a_desired_goal(self.env) for _ in range(self.sample_N)]
 
             # compute candidate goals' KDE score
-            candidate_goal_scores = np.exp(self.kde.score_samples(candidate_goals))
+            scaled_candidate_goals, candidate_goal_scores = self.kde_estimator.evaluate(candidate_goals)
 
             # print(candidate_goal_scores)
 
             # kde_score低于self.kde_score_threshold的goal，认为是无法完成的goal，不采样这些目标
             candidate_goal_scores_backup = candidate_goal_scores.copy()
-            candidate_goal_scores[candidate_goal_scores < self.kde_score_threshold] = np.Infinity
+            candidate_goal_scores[candidate_goal_scores < self.kde_score_threshold] = np.inf
 
-            if np.all(candidate_goal_scores==np.Infinity):
+            if np.all(candidate_goal_scores==np.inf):
                 # 处理所有采样点的score都小于threshold的情况！！！！
                 candidate_goal_index = np.argmax(candidate_goal_scores_backup)
                 print(f"\033[31m find max: point {candidate_goals[candidate_goal_index]} with score {candidate_goal_scores_backup[candidate_goal_index]}\033[0m from {candidate_goal_scores_backup}, score_threshold: {self.kde_score_threshold}")
@@ -108,12 +108,9 @@ class MEGAWrapper(Wrapper):
 
 
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None) -> tuple[Any, dict[str, Any]]:
-        
-        if seed is not None:
-            obs, info = super().reset(seed=seed, options=options)
 
         # sample mega goal
         mega_goal = self.sample_goal()
-        
+
         # modify obs and info
-        return desired_goal_utils.reset_env_with_desired_goal(self.env, mega_goal)
+        return desired_goal_utils.reset_env_with_desired_goal(self.env, mega_goal, seed=seed, options=options)

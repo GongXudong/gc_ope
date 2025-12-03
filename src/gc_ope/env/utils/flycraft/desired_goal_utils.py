@@ -19,7 +19,12 @@ def sample_a_desired_goal(env: Union[FlyCraftEnv, gym.Wrapper]) -> np.ndarray:
     goal_dict = env.unwrapped.task.goal_sampler.sample_goal()
     return np.array([goal_dict["v"], goal_dict["mu"], goal_dict["chi"]])
 
-def reset_env_with_desired_goal(env: Union[FlyCraftEnv, gym.Wrapper], desired_goal: np.ndarray)  -> tuple[ObsType, dict[str, Any]]:
+def reset_env_with_desired_goal(
+    env: Union[FlyCraftEnv, gym.Wrapper],
+    desired_goal: np.ndarray,
+    seed: int | None = None,
+    options: dict[str, Any] | None = None,
+)  -> tuple[ObsType, dict[str, Any]]:
     """按指定的desired_goal初始化环境。
 
     Args:
@@ -29,7 +34,7 @@ def reset_env_with_desired_goal(env: Union[FlyCraftEnv, gym.Wrapper], desired_go
     Returns:
         tuple[ObsType, dict[str, Any]]: 按期望目标重置环境后的观测、辅助信息
     """
-    obs, info = env.reset()
+    obs, info = env.reset(seed=seed, options=options)
 
     env.unwrapped.task.goal = desired_goal.copy()
 

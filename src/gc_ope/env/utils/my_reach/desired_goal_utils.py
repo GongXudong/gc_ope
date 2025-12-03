@@ -63,7 +63,12 @@ def get_random_dgs_2(env: Union[PandaReachEnv], num_dg: int) -> list[np.ndarray]
     return [env.unwrapped.task._sample_goal() for _ in range(num_dg)]
 
 
-def reset_env_with_desired_goal(env: Union[MyPandaReachEnv, gym.Wrapper], desired_goal: np.ndarray)  -> tuple[ObsType, dict[str, Any]]:
+def reset_env_with_desired_goal(
+    env: Union[MyPandaReachEnv, gym.Wrapper],
+    desired_goal: np.ndarray,
+    seed: int | None = None,
+    options: dict[str, Any] | None = None,
+)  -> tuple[ObsType, dict[str, Any]]:
     """按指定的desired_goal初始化环境。
 
     Args:
@@ -73,7 +78,7 @@ def reset_env_with_desired_goal(env: Union[MyPandaReachEnv, gym.Wrapper], desire
     Returns:
         tuple[ObsType, dict[str, Any]]: 按期望目标重置环境后的观测、辅助信息
     """
-    obs, info = env.reset()
+    obs, info = env.reset(seed=seed, options=options)
 
     tmp_episode_goal = desired_goal.copy()
     env.unwrapped.task.goal = tmp_episode_goal
