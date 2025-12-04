@@ -289,7 +289,7 @@ class MyEvalCallbackSTAT(EventCallback):
         warn: bool = True,
         sync_success_stat: bool = True,
         sync_success_stat_env_method_name: str = "sync_evaluation_stat",
-        training_envs: SubprocVecEnv = None
+        training_envs: SubprocVecEnv = None,
     ):
         super().__init__(callback_after_eval, verbose=verbose)
 

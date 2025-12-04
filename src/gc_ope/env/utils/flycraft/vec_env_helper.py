@@ -4,9 +4,9 @@ from pathlib import Path
 from gymnasium.envs.registration import EnvSpec
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 from stable_baselines3.common.utils import set_random_seed
-
 from flycraft.env import FlyCraftEnv
 
+from gc_ope.algorithm.curriculum.mega_wrapper import MEGAWrapper
 from gc_ope.env.utils.flycraft.my_wrappers import ScaledActionWrapper, ScaledObservationWrapper
 
 
@@ -28,10 +28,24 @@ def make_env(rank: int, seed: int = 0, **kwargs):
             id="FlyCraft-v0",
         )
 
+        # 增加课程学习wrapper
+        if kwargs.get("use_curriculum", False):
+            curriculum_method = kwargs.get("curriculum_method", "")
+            curriculum_kwargs = kwargs.get("curriculum_kwargs", {})
+
+            if curriculum_method == "mega":
+                curriculum_wrapper_class = MEGAWrapper
+            else:
+                raise ValueError(f"Can not process curriculum method: {curriculum_method}!")
+
+            print(f"Check curriculum, method: {curriculum_method}, kwargs: {curriculum_kwargs}")
+            env = curriculum_wrapper_class(env, **curriculum_kwargs)
+
         env = ScaledActionWrapper(ScaledObservationWrapper(env))
         env.reset(seed=seed + rank)
         print(seed+rank, env.unwrapped.task.np_random, env.unwrapped.task.goal_sampler.np_random)
         return env
+
     set_random_seed(seed)
     return _init
 

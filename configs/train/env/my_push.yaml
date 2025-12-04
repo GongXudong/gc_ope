@@ -1,4 +1,13 @@
 env_id: MyPushSparse-v0
+# begin: curriculum
+use_curriculum: false
+curriculum_method: mega
+curriculum_kwargs:
+  sample_n: 100
+  kde_kernel: gaussian
+  kde_bandwidth: 0.2
+  kde_data_discounted_factor: 0.9
+# end: curriculum
 train_env:  # 训练中的VecEnv配置
   num_process: 1
   seed: 3

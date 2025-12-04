@@ -10,10 +10,10 @@ maze_map: [
   [1, "g", "g", 1, "g", "g", "g", 1, "g", "g", "g", 1],
   [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 ]
-reward_type: sparse
+reward_type: dense
 continuing_task: false
 # begin: curriculum
-use_curriculum: false
+use_curriculum: true
 curriculum_method: mega
 curriculum_kwargs:
   sample_n: 100
@@ -30,4 +30,4 @@ evaluation_env:  # 评估中的VecEnv配置
 callback_env:  # Callback中的VecEnv配置
   num_process: 16
   seed: 7
-env_str: my_pointmaze
+env_str: my_pointmaze_dense

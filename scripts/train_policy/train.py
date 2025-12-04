@@ -47,6 +47,7 @@ def train_agent(cfg: DictConfig) -> None:
         callback_cfg=cfg.callback,
         env_cfg=cfg.env,
         env=callback_env,
+        training_envs=train_env,
     )
     sb3_logger.info(f"Init callback successfully, {str(callback_list)}")
 

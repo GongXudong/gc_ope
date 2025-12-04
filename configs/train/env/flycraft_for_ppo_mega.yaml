@@ -1,7 +1,7 @@
 env_id: FlyCraft-v0
 config_file: configs/env_configs/flycraft/env_config_for_ppo_easy.json
 # begin: curriculum
-use_curriculum: false
+use_curriculum: true
 curriculum_method: mega
 curriculum_kwargs:
   sample_n: 100

@@ -1,15 +1,6 @@
-env_id: MyAntMaze_U_Diverse_G-v3
-maze_map: [
-  [1, 1, 1, 1, 1],
-  [1, "r", "g", "g", 1],
-  [1, 1, 1, "g", 1],
-  [1, "g", "g", "g", 1],
-  [1, 1, 1, 1, 1],
-]
-reward_type: sparse
-continuing_task: false
+env_id: MyReachDense-v0
 # begin: curriculum
-use_curriculum: false
+use_curriculum: true
 curriculum_method: mega
 curriculum_kwargs:
   sample_n: 100
@@ -26,4 +17,4 @@ evaluation_env:  # 评估中的VecEnv配置
 callback_env:  # Callback中的VecEnv配置
   num_process: 16
   seed: 7
-env_str: my_antmaze_u
+env_str: myreach_dense

@@ -15,6 +15,7 @@ from gc_ope.env.utils.my_push.register_env import register_my_push
 from gc_ope.env.utils.my_slide.register_env import register_my_slide
 from gc_ope.env.utils.my_maze.register_env import register_my_point_maze, register_my_ant_maze
 # from gc_ope.env.utils.pointmaze.vec_env_helper import make_env as make_pointmaze_env
+from gc_ope.algorithm.curriculum.mega_wrapper import MEGAWrapper
 
 
 gym.register_envs(flycraft)
@@ -64,6 +65,9 @@ def get_flycraft_envs(env_cfg: DictConfig) -> tuple[VecEnv, VecEnv, VecEnv]:
         "seed": env_cfg.train_env.seed,
         "config_file": str(PROJECT_ROOT_DIR / env_cfg.config_file),
         "custom_config": OmegaConf.to_container(env_cfg.train_env.custom_config),  # use OmegaConf.to_container to safe convert DictConfig to dict
+        "use_curriculum": env_cfg.use_curriculum,
+        "curriculum_method": env_cfg.curriculum_method,
+        "curriculum_kwargs": env_cfg.curriculum_kwargs,
     }
 
     env_config_dict_in_eval = deepcopy(env_config_dict_in_training)
@@ -98,12 +102,31 @@ def get_flycraft_envs(env_cfg: DictConfig) -> tuple[VecEnv, VecEnv, VecEnv]:
 def get_my_reach_envs(env_cfg: DictConfig) -> tuple[VecEnv, VecEnv, VecEnv]:
 
     # 训练使用的环境
-    vec_env = make_vec_env(
-        env_id=env_cfg.env_id,
-        n_envs=env_cfg.train_env.num_process,
-        seed=env_cfg.train_env.seed,
-        vec_env_cls=SubprocVecEnv,
-    )
+    if env_cfg.use_curriculum:
+        
+        curriculum_method = env_cfg.curriculum_method
+        curriculum_kwargs = env_cfg.curriculum_kwargs
+
+        if curriculum_method == "mega":
+            curriculum_wrapper_class = MEGAWrapper
+        else:
+            raise ValueError(f"Can not process curriculum method: {curriculum_method}!")
+
+        vec_env = make_vec_env(
+            env_id=env_cfg.env_id,
+            n_envs=env_cfg.train_env.num_process,
+            seed=env_cfg.train_env.seed,
+            vec_env_cls=SubprocVecEnv,
+            wrapper_class=curriculum_wrapper_class,
+            wrapper_kwargs=curriculum_kwargs,
+        )
+    else:
+        vec_env = make_vec_env(
+            env_id=env_cfg.env_id,
+            n_envs=env_cfg.train_env.num_process,
+            seed=env_cfg.train_env.seed,
+            vec_env_cls=SubprocVecEnv,
+        )
 
     # evaluate_policy使用的测试环境
     eval_env = make_vec_env(
@@ -126,17 +149,41 @@ def get_my_reach_envs(env_cfg: DictConfig) -> tuple[VecEnv, VecEnv, VecEnv]:
 def get_my_pointmaze_envs(env_cfg: DictConfig) -> tuple[VecEnv, VecEnv, VecEnv]:
 
     # 训练使用的环境
-    vec_env = make_vec_env(
-        env_id=env_cfg.env_id,
-        n_envs=env_cfg.train_env.num_process,
-        seed=env_cfg.train_env.seed,
-        vec_env_cls=SubprocVecEnv,
-        env_kwargs={
-            "maze_map": env_cfg.maze_map,
-            "reward_type": env_cfg.reward_type,
-            "continuing_task": env_cfg.continuing_task,
-        }
-    )
+    if env_cfg.use_curriculum:
+        
+        curriculum_method = env_cfg.curriculum_method
+        curriculum_kwargs = env_cfg.curriculum_kwargs
+
+        if curriculum_method == "mega":
+            curriculum_wrapper_class = MEGAWrapper
+        else:
+            raise ValueError(f"Can not process curriculum method: {curriculum_method}!")
+
+        vec_env = make_vec_env(
+            env_id=env_cfg.env_id,
+            n_envs=env_cfg.train_env.num_process,
+            seed=env_cfg.train_env.seed,
+            vec_env_cls=SubprocVecEnv,
+            env_kwargs={
+                "maze_map": env_cfg.maze_map,
+                "reward_type": env_cfg.reward_type,
+                "continuing_task": env_cfg.continuing_task,
+            },
+            wrapper_class=curriculum_wrapper_class,
+            wrapper_kwargs=curriculum_kwargs,
+        )
+    else:
+        vec_env = make_vec_env(
+            env_id=env_cfg.env_id,
+            n_envs=env_cfg.train_env.num_process,
+            seed=env_cfg.train_env.seed,
+            vec_env_cls=SubprocVecEnv,
+            env_kwargs={
+                "maze_map": env_cfg.maze_map,
+                "reward_type": env_cfg.reward_type,
+                "continuing_task": env_cfg.continuing_task,
+            },
+        )
 
     # evaluate_policy使用的测试环境
     eval_env = make_vec_env(
@@ -148,7 +195,7 @@ def get_my_pointmaze_envs(env_cfg: DictConfig) -> tuple[VecEnv, VecEnv, VecEnv]:
             "maze_map": env_cfg.maze_map,
             "reward_type": env_cfg.reward_type,
             "continuing_task": env_cfg.continuing_task,
-        }
+        },
     )
 
     # 回调函数中使用的测试环境
@@ -161,7 +208,7 @@ def get_my_pointmaze_envs(env_cfg: DictConfig) -> tuple[VecEnv, VecEnv, VecEnv]:
             "maze_map": env_cfg.maze_map,
             "reward_type": env_cfg.reward_type,
             "continuing_task": env_cfg.continuing_task,
-        }
+        },
     )
 
     return vec_env, eval_env, eval_env_in_callback

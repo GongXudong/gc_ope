@@ -111,7 +111,7 @@ def test_mega_wrapper_sample_goal_with_push_1():
     print(mega_env.kde_estimator.evaluate(desired_goals=dgs))
 
     print("Sample Goal......")
-    
+
     for i in range(3):
         print(f"Trial {i}: \n", mega_env.sample_goal())
 

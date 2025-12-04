@@ -13,7 +13,7 @@ maze_map: [
 reward_type: sparse
 continuing_task: false
 # begin: curriculum
-use_curriculum: false
+use_curriculum: true
 curriculum_method: mega
 curriculum_kwargs:
   sample_n: 100
