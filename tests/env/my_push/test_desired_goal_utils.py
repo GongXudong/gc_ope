@@ -37,6 +37,7 @@ def test_get_all_possible_dgs():
     all_dgs = my_push_desired_goal_utils.get_all_possible_dgs(env=env, step_x=0.02, step_y=0.02, step_z=0.02)
     print(len(all_dgs), np.array(all_dgs))
 
+
 def test_get_random_dgs():
     print("In test get random dgs:")
 
@@ -80,8 +81,27 @@ def test_reset_env_with_desired_goal(test_pkg: Literal["my_push", "common"]):
 
             assert np.allclose(obs["desired_goal"], dg, atol=EPS)
 
+
+@pytest.mark.parametrize(
+    "test_pkg",
+    [("my_push"), ("common")],
+)
+def test_get_desired_goal_space_volumn(test_pkg: Literal["my_push", "common"]):
+    print("In test get desired goal space volumn:")
+
+    env = gym.make("MyPushSparse-v0")
+
+    if test_pkg == "my_push":
+        volumn = my_push_desired_goal_utils.get_desired_goal_space_volumn(env)
+    else:
+        volumn = common_desired_goal_utils.get_desired_goal_space_volumn(env)
+
+    print(volumn)
+
+
 if __name__ == "__main__":
     test_sample_a_desired_goal("common")
     test_get_all_possible_dgs()
     test_get_random_dgs()
     test_reset_env_with_desired_goal("common")
+    test_get_desired_goal_space_volumn("common")

@@ -4,7 +4,7 @@ config_file: configs/env_configs/flycraft/env_config_for_sac_easy.json
 use_curriculum: true
 curriculum_method: mega
 curriculum_kwargs:
-  sample_n: 100
+  sample_n: 10
   kde_kernel: gaussian
   kde_bandwidth: 0.2
   kde_data_discounted_factor: 0.9

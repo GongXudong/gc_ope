@@ -93,3 +93,10 @@ def reset_env_with_desired_goal(
     info = {"is_success": env.unwrapped.task.is_success(obs["achieved_goal"], env.unwrapped.task.get_goal())}
 
     return obs, info
+
+
+def get_desired_goal_space_volumn(env: Union[PandaReachEnv, gym.Wrapper]) -> float:
+    """计算desired_goal空间的体积
+    """
+
+    return np.prod([(dim_max - dim_min) for dim_min, dim_max in zip(env.unwrapped.task.goal_range_low, env.unwrapped.task.goal_range_high)])

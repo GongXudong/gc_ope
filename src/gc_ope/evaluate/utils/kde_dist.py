@@ -1,3 +1,4 @@
+from typing import Callable, Union
 import numpy as np
 from sklearn.neighbors import KernelDensity
 
@@ -24,7 +25,7 @@ def kl_divergence_kde_3d_monte_carlo(kde_p: KernelDensity, kde_q: KernelDensity,
     
     return kl_value
 
-def kl_divergence_kde_3d(kde_p, kde_q, bounds=None, sample_points=50):
+def kl_divergence_kde_3d(kde_p: KernelDensity, kde_q: KernelDensity, bounds: list=None, sample_points: int=50):
     """
     计算两个三维KDE分布之间的KL散度
     
@@ -76,4 +77,40 @@ def kl_divergence_kde_3d(kde_p, kde_q, bounds=None, sample_points=50):
     
     kl_value = np.sum(integrand) * dV
     
+    return kl_value
+
+
+def kl_divergence_uniform_to_kde_monte_carlo(
+    sample_uniform_func: Callable[[], Union[list, np.ndarray]],
+    u_density: float,
+    kde_p: KernelDensity,
+    n_samples: int=10000,
+) -> float:
+    """使用蒙特卡洛方法计算均匀分布u与KernelDensity p之间的KL距离，KL(u || p)
+
+    Args:
+        sample_uniform_func (Callable): 从均匀分布u中采样样本的函数
+        u_density (float): 均匀分布u的概率密度
+        kde_p (KernelDensity): 分布p
+        n_samples (int, optional): 使用蒙特卡洛估计KL使用的样本数. Defaults to 10000.
+
+    Returns:
+        float: KL(u || p)
+    """
+    # 采样
+    samples_u = np.array([sample_uniform_func() for _ in range(n_samples)])
+    
+    # 计算均匀分布的对数概率密度
+    log_u = np.log(u_density)
+    
+    # 计算p分布的对数概率密度
+    log_p = kde_p.score_samples(samples_u)
+    
+    # 数值稳定性处理
+    mask = np.exp(log_p) > 1e-10
+    if np.sum(mask) == 0:
+        return np.inf
+    
+    # KL散度计算
+    kl_value = log_u - np.mean(log_p[mask])
     return kl_value

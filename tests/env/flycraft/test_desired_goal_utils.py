@@ -21,6 +21,8 @@ PROJECT_ROOT_DIR = Path(__file__).parent.parent.parent.parent
     [("flycraft"), ("common")],
 )
 def test_sample_a_desired_goal_1(test_pkg):
+    print("In test sample a desired goal 1:")
+
     env = gym.make("FlyCraft-v0")
     print(env)
 
@@ -37,11 +39,14 @@ def test_sample_a_desired_goal_1(test_pkg):
         assert dg_min[1] <= dg[1] <= dg_max[1]
         assert dg_min[2] <= dg[2] <= dg_max[2]
 
+
 @pytest.mark.parametrize(
     "test_pkg",
     [("flycraft"), ("common")],
 )
 def test_sample_a_desired_goal_2(test_pkg: Literal["flycraft", "common"]):
+    print("In test sample a desired goal 2:")
+
     cfg = load_config(
         config_path="../../../configs/train",
         config_name="config",
@@ -64,11 +69,31 @@ def test_sample_a_desired_goal_2(test_pkg: Literal["flycraft", "common"]):
         assert dg_min[1] <= dg[1] <= dg_max[1]
         assert dg_min[2] <= dg[2] <= dg_max[2]
 
+
+def test_get_all_possible_dgs():
+    print(f"In test get all possible dgs:")
+
+    cfg = load_config(
+        config_path="../../../configs/train",
+        config_name="config",
+    )
+
+    cfg.env.env_id = "FlyCraft-v0"
+
+    env = get_env(cfg.env)
+
+    all_dgs = flycraft_desired_goal_utils.get_all_possible_dgs(env)
+
+    print(len(all_dgs))
+
+
 @pytest.mark.parametrize(
     "test_pkg",
     [("flycraft"), ("common")],
 )
 def test_reset_env_with_desired_goal(test_pkg: Literal["flycraft", "common"]):
+    print("In test reset env with desired goal:")
+
     cfg = load_config(
         config_path="../../../configs/train",
         config_name="config",
@@ -108,7 +133,33 @@ def test_reset_env_with_desired_goal(test_pkg: Literal["flycraft", "common"]):
             else:
                 assert np.allclose(next_obs["desired_goal"], dg, atol=EPS)
 
+
+@pytest.mark.parametrize(
+    "test_pkg",
+    [("flycraft"), ("common")],
+)
+def test_get_desired_goal_space_volumn(test_pkg: Literal["flycraft", "common"]):
+    print("In test get desired goal space volumn:")
+
+    cfg = load_config(
+        config_path="../../../configs/train",
+        config_name="config",
+    )
+
+    cfg.env.env_id = "FlyCraft-v0"
+
+    env = get_env(cfg.env)
+
+    if test_pkg == "flycraft":
+        volumn = flycraft_desired_goal_utils.get_desired_goal_space_volumn(env)
+    else:
+        volumn = common_desired_goal_utils.get_desired_goal_space_volumn(env)
+
+    print(volumn)
+
 if __name__ == "__main__":
     test_sample_a_desired_goal_1("common")
     test_sample_a_desired_goal_2("common")
+    test_get_all_possible_dgs()
     test_reset_env_with_desired_goal("common")
+    test_get_desired_goal_space_volumn("common")

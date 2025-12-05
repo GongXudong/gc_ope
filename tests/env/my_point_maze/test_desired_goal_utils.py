@@ -70,6 +70,26 @@ def test_reset_env_with_desired_goal(test_pkg: Literal["my_pointmaze", "common"]
             assert np.allclose(obs["desired_goal"], dg, atol=EPS)
 
 
+@pytest.mark.parametrize(
+    "test_pkg",
+    [("my_pointmaze"), ("common")],
+)
+def test_get_desired_goal_space_volumn(test_pkg: Literal["my_pointmaze", "common"]):
+    print("In test get desired goal space volumn:")
+
+    env = gym.make("MyPointMaze_Large_Diverse_G-v3")
+
+    if test_pkg == "my_pointmaze":
+        volumn = my_pointmaze_desired_goal_utils.get_desired_goal_space_volumn(env)
+    else:
+        volumn = common_desired_goal_utils.get_desired_goal_space_volumn(env)
+
+    print(env.unwrapped.position_noise_range, env.unwrapped.maze.maze_size_scaling)
+    print(env.unwrapped.maze.unique_goal_locations)
+    print(volumn)
+
+
 if __name__ == "__main__":
     test_sample_a_desired_goal_1("common")
     test_reset_env_with_desired_goal("common")
+    test_get_desired_goal_space_volumn("common")

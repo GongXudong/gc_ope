@@ -96,9 +96,28 @@ def test_reset_env_with_desired_goal(test_pkg: Literal["my_reach", "common"]):
 
             assert np.allclose(obs["desired_goal"], dg, atol=EPS)
 
+
+@pytest.mark.parametrize(
+    "test_pkg",
+    [("my_reach"), ("common")],
+)
+def test_get_desired_goal_space_volumn(test_pkg: Literal["my_reach", "common"]):
+    print("In test get desired goal space volumn:")
+
+    env = gym.make("MyReachSparse-v0")
+
+    if test_pkg == "my_reach":
+        volumn = my_reach_desired_goal_utils.get_desired_goal_space_volumn(env)
+    else:
+        volumn = common_desired_goal_utils.get_desired_goal_space_volumn(env)
+
+    print(volumn)
+
+
 if __name__ == "__main__":
     test_sample_a_desired_goal("common")
     test_get_all_possible_dgs()
     test_get_random_dgs()
     test_get_random_dgs_2()
     test_reset_env_with_desired_goal("common")
+    test_get_desired_goal_space_volumn("common")

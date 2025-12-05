@@ -84,5 +84,13 @@ class MyPointMazeEnv(PointMazeEnv):
         info["success"] = bool(
             np.linalg.norm(obs_dict["achieved_goal"] - self.goal) <= 0.45
         )
+        info["is_success"] = info["success"]
 
         return obs_dict, info
+
+    def step(self, action):
+
+        obs_dict, reward, terminated, truncated, info = super().step(action)
+        info["is_success"] = info["success"]
+
+        return obs_dict, reward, terminated, truncated, info

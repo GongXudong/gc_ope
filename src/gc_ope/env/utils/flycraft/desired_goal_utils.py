@@ -1,4 +1,5 @@
 from typing import Union, Any
+import itertools
 import numpy as np
 import gymnasium as gym
 from gymnasium.core import ObsType
@@ -18,6 +19,27 @@ def sample_a_desired_goal(env: Union[FlyCraftEnv, gym.Wrapper]) -> np.ndarray:
     """
     goal_dict = env.unwrapped.task.goal_sampler.sample_goal()
     return np.array([goal_dict["v"], goal_dict["mu"], goal_dict["chi"]])
+
+
+def get_all_possible_dgs(env: Union[FlyCraftEnv], step_v: float=10, step_mu: float=2, step_chi: float=2) -> list[tuple]:
+    """以step为间隔，在desired goal space中生成所有可能的goal。
+    """
+    v_min = env.unwrapped.task.config["goal"]["v_min"]
+    v_max = env.unwrapped.task.config["goal"]["v_max"]
+    mu_min = env.unwrapped.task.config["goal"]["mu_min"]
+    mu_max = env.unwrapped.task.config["goal"]["mu_max"]
+    chi_min = env.unwrapped.task.config["goal"]["chi_min"]
+    chi_max = env.unwrapped.task.config["goal"]["chi_max"]
+
+    EPS = 1e-6
+
+    vs = np.arange(v_min, v_max + EPS, step_v)
+    mus = np.arange(mu_min, mu_max + EPS, step_mu)
+    chis = np.arange(chi_min, chi_max + EPS, step_chi)
+
+    all_dgs = list(itertools.product(vs, mus, chis))
+    return all_dgs
+
 
 def reset_env_with_desired_goal(
     env: Union[FlyCraftEnv, gym.Wrapper],
@@ -46,3 +68,20 @@ def reset_env_with_desired_goal(
         return tmp_env.scale_state(new_obs), info
     else:
         return new_obs, info
+
+
+def get_desired_goal_space_volumn(env: Union[FlyCraftEnv, gym.Wrapper]) -> float:
+    """计算desired_goal空间的体积
+    """
+    dg_mins = [
+        env.unwrapped.env_config["goal"]["v_min"],
+        env.unwrapped.env_config["goal"]["mu_min"],
+        env.unwrapped.env_config["goal"]["chi_min"],
+    ]
+    dg_maxs = [
+        env.unwrapped.env_config["goal"]["v_max"],
+        env.unwrapped.env_config["goal"]["mu_max"],
+        env.unwrapped.env_config["goal"]["chi_max"],
+    ]
+
+    return np.prod([(dim_max - dim_min) for dim_min, dim_max in zip(dg_mins, dg_maxs)])

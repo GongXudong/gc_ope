@@ -79,8 +79,27 @@ def test_reset_env_with_desired_goal(test_pkg: Literal["my_slide", "common"]):
 
             assert np.allclose(obs["desired_goal"], dg, atol=EPS)
 
+
+@pytest.mark.parametrize(
+    "test_pkg",
+    [("my_slide"), ("common")],
+)
+def test_get_desired_goal_space_volumn(test_pkg: Literal["my_slide", "common"]):
+    print("In test get desired goal space volumn:")
+
+    env = gym.make("MySlideSparse-v0")
+
+    if test_pkg == "my_slide":
+        volumn = my_slide_desired_goal_utils.get_desired_goal_space_volumn(env)
+    else:
+        volumn = common_desired_goal_utils.get_desired_goal_space_volumn(env)
+
+    print(volumn)
+
+
 if __name__ == "__main__":
     test_sample_a_desired_goal("common")
     test_get_all_possible_dgs()
     test_get_random_dgs()
     test_reset_env_with_desired_goal("common")
+    test_get_desired_goal_space_volumn("common")

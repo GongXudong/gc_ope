@@ -65,9 +65,6 @@ def get_flycraft_envs(env_cfg: DictConfig) -> tuple[VecEnv, VecEnv, VecEnv]:
         "seed": env_cfg.train_env.seed,
         "config_file": str(PROJECT_ROOT_DIR / env_cfg.config_file),
         "custom_config": OmegaConf.to_container(env_cfg.train_env.custom_config),  # use OmegaConf.to_container to safe convert DictConfig to dict
-        "use_curriculum": env_cfg.use_curriculum,
-        "curriculum_method": env_cfg.curriculum_method,
-        "curriculum_kwargs": env_cfg.curriculum_kwargs,
     }
 
     env_config_dict_in_eval = deepcopy(env_config_dict_in_training)
@@ -86,6 +83,9 @@ def get_flycraft_envs(env_cfg: DictConfig) -> tuple[VecEnv, VecEnv, VecEnv]:
 
     # 训练使用的环境
     vec_env = get_flycraft_vec_env(
+        use_curriculum=env_cfg.use_curriculum,
+        curriculum_method=env_cfg.curriculum_method,
+        curriculum_kwargs=env_cfg.curriculum_kwargs,
         **env_config_dict_in_training
     )
     # evaluate_policy使用的测试环境

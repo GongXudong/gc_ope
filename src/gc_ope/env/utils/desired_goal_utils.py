@@ -67,3 +67,20 @@ def reset_env_with_desired_goal(
         return push_desired_goal_utils.reset_env_with_desired_goal(env, desired_goal, seed=seed, options=options)
     else:
         raise ValueError(f"Can not process env: {env_id}!")
+
+
+def get_desired_goal_space_volumn(env: Union[FlyCraftEnv, MyPointMazeEnv, MyAntMazeEnv, MyPandaReachEnv, MyPandaPushEnv, MyPandaSlideEnv, gym.Wrapper]) -> float:
+    """计算desired_goal空间的体积
+    """
+    env_id = env.unwrapped.spec.id
+
+    if env_id.startswith("FlyCraft"):
+        return flycraft_desired_goal_utils.get_desired_goal_space_volumn(env)
+    elif env_id.startswith("MyPointMaze") or env_id.startswith("MyAntMaze"):
+        return maze_desired_goal_utils.get_desired_goal_space_volumn(env)
+    elif env_id.startswith("MyReach"):
+        return reach_desired_goal_utils.get_desired_goal_space_volumn(env)
+    elif env_id.startswith("MyPush") or env_id.startswith("MySlide"):
+        return push_desired_goal_utils.get_desired_goal_space_volumn(env)
+    else:
+        raise ValueError(f"Can not process env: {env_id}!")

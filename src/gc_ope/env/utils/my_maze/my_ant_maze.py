@@ -10,7 +10,17 @@ class MyAntMazeEnv(AntMazeEnv):
         super().__init__(render_mode, maze_map, reward_type, continuing_task, reset_target, xml_file, **kwargs)
 
     def reset(self, *, seed = None, **kwargs):
-        
+        """每次reset的初始位置不添加随机噪声。
+
+        下面的代码copy自PointMazeEnv的reset()和MazeEnv的reset()
+
+        Args:
+            seed (_type_, optional): _description_. Defaults to None.
+
+        Returns:
+            _type_: _description_
+        """
+
         # from reset() of MazeEnv
         GoalEnv.reset(self, seed=seed)
 
@@ -74,5 +84,13 @@ class MyAntMazeEnv(AntMazeEnv):
         info["success"] = bool(
             np.linalg.norm(obs_dict["achieved_goal"] - self.goal) <= 0.45
         )
+        info["is_success"] = info["success"]
 
         return obs_dict, info
+
+    def step(self, action):
+
+        obs_dict, reward, terminated, truncated, info = super().step(action)
+        info["is_success"] = info["success"]
+
+        return obs_dict, reward, terminated, truncated, info

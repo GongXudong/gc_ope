@@ -39,6 +39,7 @@ def get_all_possible_dgs(env: Union[PandaPushEnv, PandaSlideEnv], step_x: float=
     all_dgs = list(itertools.product(xs, ys, zs))
     return all_dgs
 
+
 def get_random_dgs(env: Union[PandaPushEnv, PandaSlideEnv], num_dg: int) -> list[tuple]:
 
     x_min = env.unwrapped.task.goal_range_low[0]
@@ -89,3 +90,10 @@ def reset_env_with_desired_goal(
     info = {"is_success": env.unwrapped.task.is_success(obs["achieved_goal"], env.unwrapped.task.get_goal())}
 
     return obs, info
+
+
+def get_desired_goal_space_volumn(env: Union[PandaPushEnv, PandaSlideEnv, gym.Wrapper]) -> float:
+    """计算desired_goal空间的体积
+    """
+
+    return np.prod([(dim_max - dim_min) for dim_min, dim_max in zip(env.unwrapped.task.goal_range_low[:2], env.unwrapped.task.goal_range_high[:2])])

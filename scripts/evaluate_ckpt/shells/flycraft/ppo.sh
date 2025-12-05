@@ -8,6 +8,8 @@ uv run --offline scripts/evaluate_ckpt/evaluate_flycraft.py algo_type=ppo ckpt_d
 uv run --offline scripts/evaluate_ckpt/evaluate_flycraft.py algo_type=ppo ckpt_dir=checkpoints/flycraft/easy/ppo/seed_5 env=flycraft_for_ppo process_num=64 eval_cfg.dg_gen_method=random eval_cfg.eval_dg_num=1000 eval_res_csv_file_suffix=eval_res_on_random seed=64
 
 uv run --offline scripts/evaluate_ckpt/evaluate_flycraft.py algo_type=ppo ckpt_dir=checkpoints/flycraft/easy/ppo/seed_20 env=flycraft_for_ppo process_num=64 eval_cfg.dg_gen_method=random eval_cfg.eval_dg_num=1000 eval_res_csv_file_suffix=eval_res_on_random seed=234
+uv run --offline scripts/evaluate_ckpt/evaluate_flycraft.py algo_type=ppo ckpt_dir=checkpoints/flycraft/easy/ppo/seed_21 env=flycraft_for_ppo process_num=64 eval_cfg.dg_gen_method=random eval_cfg.eval_dg_num=1000 eval_res_csv_file_suffix=eval_res_on_random seed=254
+uv run --offline scripts/evaluate_ckpt/evaluate_flycraft.py algo_type=ppo ckpt_dir=checkpoints/flycraft/easy/ppo/seed_29 env=flycraft_for_ppo process_num=64 eval_cfg.dg_gen_method=random eval_cfg.eval_dg_num=1000 eval_res_csv_file_suffix=eval_res_on_random seed=306
 
 ## generate desired goals by enumerating over fixed dg intervals
 uv run --offline scripts/evaluate_ckpt/evaluate_flycraft.py algo_type=ppo ckpt_dir=checkpoints/flycraft/easy/ppo/seed_1 env=flycraft_for_ppo process_num=64 eval_cfg.dg_gen_method=fixed eval_cfg.v_interval=10 eval_cfg.mu_interval=2 eval_cfg.chi_interval=2 eval_res_csv_file_suffix=eval_res_on_fixed seed=11
@@ -17,3 +19,5 @@ uv run --offline scripts/evaluate_ckpt/evaluate_flycraft.py algo_type=ppo ckpt_d
 uv run --offline scripts/evaluate_ckpt/evaluate_flycraft.py algo_type=ppo ckpt_dir=checkpoints/flycraft/easy/ppo/seed_5 env=flycraft_for_ppo process_num=64 eval_cfg.dg_gen_method=fixed eval_cfg.v_interval=10 eval_cfg.mu_interval=2 eval_cfg.chi_interval=2 eval_res_csv_file_suffix=eval_res_on_fixed seed=57
 
 uv run --offline scripts/evaluate_ckpt/evaluate_flycraft.py algo_type=ppo ckpt_dir=checkpoints/flycraft/easy/ppo/seed_20 env=flycraft_for_ppo process_num=64 eval_cfg.dg_gen_method=fixed eval_cfg.v_interval=10 eval_cfg.mu_interval=2 eval_cfg.chi_interval=2 eval_res_csv_file_suffix=eval_res_on_fixed seed=115
+uv run --offline scripts/evaluate_ckpt/evaluate_flycraft.py algo_type=ppo ckpt_dir=checkpoints/flycraft/easy/ppo/seed_21 env=flycraft_for_ppo process_num=64 eval_cfg.dg_gen_method=fixed eval_cfg.v_interval=10 eval_cfg.mu_interval=2 eval_cfg.chi_interval=2 eval_res_csv_file_suffix=eval_res_on_fixed seed=259
+uv run --offline scripts/evaluate_ckpt/evaluate_flycraft.py algo_type=ppo ckpt_dir=checkpoints/flycraft/easy/ppo/seed_29 env=flycraft_for_ppo process_num=64 eval_cfg.dg_gen_method=fixed eval_cfg.v_interval=10 eval_cfg.mu_interval=2 eval_cfg.chi_interval=2 eval_res_csv_file_suffix=eval_res_on_fixed seed=387

@@ -2,6 +2,7 @@ import logging
 import sys
 from pathlib import Path
 from gymnasium.envs.registration import EnvSpec
+from gymnasium.wrappers import RecordEpisodeStatistics
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 from stable_baselines3.common.utils import set_random_seed
 from flycraft.env import FlyCraftEnv
@@ -42,6 +43,8 @@ def make_env(rank: int, seed: int = 0, **kwargs):
             env = curriculum_wrapper_class(env, **curriculum_kwargs)
 
         env = ScaledActionWrapper(ScaledObservationWrapper(env))
+        env = RecordEpisodeStatistics(env)  # 记录每个episode的统计信息，使SB3可以记录rollout/ep_rew_mean、rollout/ep_len_mean等指标
+
         env.reset(seed=seed + rank)
         print(seed+rank, env.unwrapped.task.np_random, env.unwrapped.task.goal_sampler.np_random)
         return env

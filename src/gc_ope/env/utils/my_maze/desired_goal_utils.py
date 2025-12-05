@@ -116,3 +116,12 @@ def reset_env_with_desired_goal(
     )
 
     return obs_dict, tmp_info
+
+
+def get_desired_goal_space_volumn(env: Union[MyPointMazeEnv, MyAntMazeEnv, gym.Wrapper]) -> float:
+    """计算desired_goal空间的体积
+    """
+
+    one_grid_volumn = env.unwrapped.position_noise_range * 2 * env.unwrapped.maze.maze_size_scaling
+
+    return one_grid_volumn * len(env.unwrapped.maze.unique_goal_locations)
