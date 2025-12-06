@@ -3,6 +3,10 @@
 TODO: Add MEGA training.
 TODO: sampling data compatible with scope-rl.
 
+## 2025-12-06
+
+* TODO: Add test for KL(u|p) for all environments.
+
 ## 2025-12-02
 
 * Add desired_goal_utils for all envs.
