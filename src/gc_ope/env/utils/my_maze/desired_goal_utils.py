@@ -21,21 +21,25 @@ def sample_a_desired_goal(env: Union[MyPointMazeEnv, MyAntMazeEnv, gym.Wrapper])
     return dg
 
 
-def generate_grid_points(center_x: float, center_y: float, maze_size_scaling: float, n: int) -> list[tuple]:
+def generate_grid_points(center_x: float, center_y: float, side_length: float, n: int) -> list[tuple]:
     """
     在正方形内部等间隔生成n*n个点。左上角的点距离左侧的边与上侧的边的距离均为“间隔的一半”。
 
     参数:
+
     center_x: 正方形中心点的x坐标
+
     center_y: 正方形中心点的y坐标
-    maze_size_scaling: 正方形的边长
+
+    side_length: 正方形的边长. Maze类中，每个方格的边长是maze.maze_size_scaling，生成desired_goal时，是在以格子中心为中心，边长为2 * position_noise_range * maze.maze_size_scaling为边长的“小格子”内采样。
+
     n: 每边的点数 (n*n个点)
 
     返回:
     list: 包含所有点坐标的列表，每个点格式为(x, y)
     """
     # 计算正方形的边界
-    half_size = maze_size_scaling / 2
+    half_size = side_length / 2
     left = center_x - half_size
     right = center_x + half_size
     bottom = center_y - half_size
@@ -52,7 +56,7 @@ def generate_grid_points(center_x: float, center_y: float, maze_size_scaling: fl
     # 间隔数量 = n - 1
     # 因此：边长 - 间隔 = (n - 1) * 间隔
     # 所以：边长 = n * 间隔
-    spacing = maze_size_scaling / n
+    spacing = side_length / n
 
     # 第一个点的位置：左边界 + 间隔/2
     start_x = left + spacing / 2
@@ -78,7 +82,11 @@ def generate_all_possible_dgs(env: MazeEnv, n: int) -> list[tuple]:
     all_goal_xys = env.maze.unique_goal_locations
 
     for tmp_goal in all_goal_xys:
-        tmp_dg_list = generate_grid_points(tmp_goal[0], tmp_goal[1], env.maze.maze_size_scaling, n)
+        # tmp_dg_list = generate_grid_points(tmp_goal[0], tmp_goal[1], env.maze.maze_size_scaling, n)
+        
+        # TODO: check
+        tmp_dg_list = generate_grid_points(tmp_goal[0], tmp_goal[1], 2 * env.position_noise_range * env.maze.maze_size_scaling, n)
+        
         dg_list.extend(tmp_dg_list)
 
     return dg_list

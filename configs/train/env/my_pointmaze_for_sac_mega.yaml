@@ -20,6 +20,7 @@ curriculum_kwargs:
   kde_kernel: gaussian
   kde_bandwidth: 0.2
   kde_data_discounted_factor: 0.9
+  sample_dg_method: mega
 # end: curriculum
 train_env:  # 训练中的VecEnv配置
   num_process: 1

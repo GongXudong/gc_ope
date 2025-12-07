@@ -126,20 +126,8 @@ class KDEEvaluator(EvaluatorBase):
         self,
         samples: Union[list, np.ndarray],
         dV: float,
-        totalV: float,
         u_density: float,
     ) -> float:
-        """使用积分法计算均匀分布u与KernelDensity p之间的KL距离，KL(u || p)
-
-        Args:
-            sample_uniform_func (Callable[[], Union[list, np.ndarray]]): 从均匀分布u中采样样本的函数
-            u_density (float): 均匀分布u的概率密度
-            n_samples (int, optional): 使用蒙特卡洛估计KL使用的样本数. Defaults to 10000.
-
-        Returns:
-            float: KL(u || p)
-        """
-
         # print(samples_u)
 
         # 计算均匀分布的对数概率密度

@@ -39,6 +39,14 @@ def test_sample_a_desired_goal_1(test_pkg: Literal["my_pointmaze", "common"]):
         assert any([(row_xy_center_of_dg[0] == task_dg[0] and row_xy_center_of_dg[1] == task_dg[1]) for task_dg in env.unwrapped.maze.unique_goal_locations])
 
 
+def test_generate_all_possible_dgs(n):
+    print("In test generate all possible dgs:")
+    env = gym.make("MyPointMaze_Large_Diverse_G-v3")
+
+    all_dgs = my_pointmaze_desired_goal_utils.generate_all_possible_dgs(env=env.unwrapped, n=n)
+    print(all_dgs)
+
+
 @pytest.mark.parametrize(
     "test_pkg",
     [("my_pointmaze"), ("common")],
@@ -93,3 +101,4 @@ if __name__ == "__main__":
     test_sample_a_desired_goal_1("common")
     test_reset_env_with_desired_goal("common")
     test_get_desired_goal_space_volumn("common")
+    test_generate_all_possible_dgs(2)

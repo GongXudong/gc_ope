@@ -39,6 +39,21 @@ def sample_a_desired_goal(env: Union[FlyCraftEnv, MyPointMazeEnv, MyAntMazeEnv, 
         raise ValueError(f"Can not process env: {env_id}!")
 
 
+def get_all_possible_dgs(env: Union[FlyCraftEnv, MyPointMazeEnv, MyAntMazeEnv, MyPandaReachEnv, MyPandaPushEnv, MyPandaSlideEnv, gym.Wrapper], **kwargs) -> list[tuple]:
+
+    env_id = env.unwrapped.spec.id
+
+    if env_id.startswith("FlyCraft"):
+        return flycraft_desired_goal_utils.get_all_possible_dgs(env=env, step_v=kwargs["step_v"], step_mu=kwargs["step_mu"], step_chi=kwargs["step_chi"])
+    elif env_id.startswith("MyReach"):
+        return reach_desired_goal_utils.get_all_possible_dgs(env=env, step_x=kwargs["step_x"], step_y=kwargs["step_y"], step_z=kwargs["step_z"])
+    elif env_id.startswith("MyPush") or env_id.startswith("MySlide"):
+        return push_desired_goal_utils.get_all_possible_dgs(env=env, step_x=kwargs["step_x"], step_y=kwargs["step_y"], step_z=kwargs["step_z"])
+    elif env_id.startswith("MyPointMaze") or env_id.startswith("MyAntMaze"):
+        return maze_desired_goal_utils.generate_all_possible_dgs(env=env, n=kwargs["n"])
+    else:
+        raise ValueError(f"Can not process env: {env_id}!")
+
 def reset_env_with_desired_goal(
     env: Union[FlyCraftEnv, MyPointMazeEnv, MyAntMazeEnv, MyPandaReachEnv, MyPandaPushEnv, MyPandaSlideEnv, gym.Wrapper],
     desired_goal: np.ndarray,
