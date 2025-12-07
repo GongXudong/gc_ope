@@ -1,11 +1,12 @@
 # GC-OPE
 
-TODO: Add MEGA training.
+TODO: Add MEGA/OMEGA training.
 TODO: sampling data compatible with scope-rl.
 
-## 2025-12-06
+## 2025-12-07
 
-* TODO: Add test for KL(u|p) for all environments.
+* Add test for KL(u|p) for all environments.
+* Debug desired_goal_utils.generate_all_possible_dgs() for maze environments, and re-evaluate sac, her, ppo on pointmaze.
 
 ## 2025-12-02
 

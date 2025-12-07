@@ -6,7 +6,6 @@ import numpy as np
 import gymnasium as gym
 from gc_ope.env.get_env import get_env
 from gc_ope.env.utils import desired_goal_utils
-from gc_ope.env.utils.flycraft import desired_goal_utils as flycraft_desired_goal_utils
 from gc_ope.evaluate.utils.get_kde_estimator import get_kde_estimator_for_eval_res
 from gc_ope.utils.load_config_with_hydra import load_config
 
@@ -106,9 +105,8 @@ def test_kl_divergence_uniform_to_kde_integrate():
 
             print(
                 kde_estimator.kl_divergence_uniform_to_kde_integrate(
-                    samples=flycraft_desired_goal_utils.get_all_possible_dgs(env, step_v=10, step_mu=2, step_chi=2),
+                    samples=desired_goal_utils.get_all_possible_dgs(env, step_v=10, step_mu=2, step_chi=2),
                     dV=10*2*2,
-                    totalV=desired_goal_utils.get_desired_goal_space_volumn(env),
                     u_density=1.0 / desired_goal_utils.get_desired_goal_space_volumn(env),
                 )
             )
