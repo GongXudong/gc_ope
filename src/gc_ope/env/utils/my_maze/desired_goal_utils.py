@@ -74,22 +74,38 @@ def generate_grid_points(center_x: float, center_y: float, side_length: float, n
     return points
 
 
-def generate_all_possible_dgs(env: MazeEnv, n: int) -> list[tuple]:
+def generate_all_possible_dgs(env: MazeEnv, n: int=5) -> list[tuple]:
     """对于MazeEnv中的所有标记为可生成goal的格子，在格子内等间隔生成n*n个goal。
     """
     dg_list = []
 
-    all_goal_xys = env.maze.unique_goal_locations
+    all_goal_xys = env.unwrapped.maze.unique_goal_locations
 
     for tmp_goal in all_goal_xys:
-        # tmp_dg_list = generate_grid_points(tmp_goal[0], tmp_goal[1], env.maze.maze_size_scaling, n)
-        
-        # TODO: check
-        tmp_dg_list = generate_grid_points(tmp_goal[0], tmp_goal[1], 2 * env.position_noise_range * env.maze.maze_size_scaling, n)
-        
+
+        tmp_dg_list = generate_grid_points(tmp_goal[0], tmp_goal[1], 2 * env.unwrapped.position_noise_range * env.unwrapped.maze.maze_size_scaling, n)
+
         dg_list.extend(tmp_dg_list)
 
     return dg_list
+
+
+def get_all_possible_dgs_and_dV(env: MazeEnv, step_list: list[float] = [5]) -> tuple[list[tuple], float]:
+    """以step为间隔，在desired goal space中生成所有可能的goal。
+    
+    Returns:
+        tuple[list[tuple], float]: 目标集合，间隔体积
+    """
+
+    assert len(step_list) == 1
+
+    inner_point_num = int(step_list[0])
+
+    all_dgs = generate_all_possible_dgs(env=env, n=inner_point_num)
+
+    dV = np.pow(2 * env.unwrapped.position_noise_range * env.unwrapped.maze.maze_size_scaling / inner_point_num, 2)
+
+    return all_dgs, dV
 
 
 def reset_env_with_desired_goal(
@@ -108,7 +124,7 @@ def reset_env_with_desired_goal(
         tuple[ObsType, dict[str, Any]]: 按期望目标重置环境后的观测、辅助信息
     """
     obs, info = env.reset(seed=seed, options=options)
-        
+
     env.unwrapped.goal = desired_goal.copy()
 
     if hasattr(env.unwrapped, "point_env"):
@@ -130,6 +146,8 @@ def get_desired_goal_space_volumn(env: Union[MyPointMazeEnv, MyAntMazeEnv, gym.W
     """计算desired_goal空间的体积
     """
 
-    one_grid_volumn = env.unwrapped.position_noise_range * 2 * env.unwrapped.maze.maze_size_scaling
+    one_grid_side_length = env.unwrapped.position_noise_range * 2 * env.unwrapped.maze.maze_size_scaling
+
+    one_grid_volumn = one_grid_side_length * one_grid_side_length
 
     return one_grid_volumn * len(env.unwrapped.maze.unique_goal_locations)

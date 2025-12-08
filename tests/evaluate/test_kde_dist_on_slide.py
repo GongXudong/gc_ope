@@ -22,7 +22,7 @@ def test_kl_divergence_uniform_to_kde_integrate():
         config_path="../../../configs/train",
         config_name="config",
     )
-    cfg.env.env_id = "MyReachSparse-v0"
+    cfg.env.env_id = "MySlideSparse-v0"
 
     cfg.env.train_env.num_process = 2
     cfg.env.evaluation_env.num_process = 1
@@ -35,7 +35,7 @@ def test_kl_divergence_uniform_to_kde_integrate():
 
     for idx in range(10000, 1000001, 10000):
         # 加载评估数据集
-        eval_res_file = f"checkpoints/myreach/easy/sac/seed_1/rl_model_{idx}_steps_eval_res_on_fixed.csv"
+        eval_res_file = f"checkpoints/my_slide/sac/seed_1/rl_model_{idx}_steps_eval_res_on_fixed.csv"
 
         # 初始化评估器
         kde_estimator = get_kde_estimator_for_eval_res(
@@ -54,7 +54,7 @@ def test_kl_divergence_uniform_to_kde_integrate():
             print(
                 kde_estimator.kl_divergence_uniform_to_kde_integrate(
                     samples=desired_goal_utils.get_all_possible_dgs(env, step_x=0.02, step_y=0.02, step_z=0.02),
-                    dV=0.02 * 0.02 * 0.02,
+                    dV=0.02 * 0.02,
                     u_density=1.0 / desired_goal_utils.get_desired_goal_space_volumn(env),
                 )
             )
@@ -74,7 +74,7 @@ def test_kl_divergence_uniform_to_kde_integrate_with_mock_uniform_evaluation_dat
         config_path="../../../configs/train",
         config_name="config",
     )
-    cfg.env.env_id = "MyReachSparse-v0"
+    cfg.env.env_id = "MySlideSparse-v0"
 
     cfg.env.train_env.num_process = 2
     cfg.env.evaluation_env.num_process = 1
@@ -97,7 +97,7 @@ def test_kl_divergence_uniform_to_kde_integrate_with_mock_uniform_evaluation_dat
         kde_kernel="gaussian",
     )
 
-    all_dgs = all_dgs[:3000]
+    all_dgs = all_dgs[:]
 
     kde_estimator.eval_res_container.add_batch(
         desired_goal_batch=all_dgs,
@@ -112,15 +112,15 @@ def test_kl_divergence_uniform_to_kde_integrate_with_mock_uniform_evaluation_dat
     print("KL(u, p) =",
         kde_estimator.kl_divergence_uniform_to_kde_integrate(
             samples=desired_goal_utils.get_all_possible_dgs(env, step_x=0.02, step_y=0.02, step_z=0.02),
-            dV=0.02 * 0.02 * 0.02,
+            dV=0.02 * 0.02,
             u_density=1.0 / desired_goal_utils.get_desired_goal_space_volumn(env),
         )
     )
 
-    # 前1000个dg -> KL(u, p) = 19.60
-    # 前2000个dg -> KL(u, p) = 1.78
-    # 前3000个dg -> KL(u, p) = 0.41
-    # 所有dg     -> KL(u, p) = 0.28
+    # 前100个dg -> KL(u, p) = 64.43
+    # 前200个dg -> KL(u, p) = 8.93
+    # 前400个dg -> KL(u, p) = 0.61
+    # 所有dg     -> KL(u, p) = 0.11
 
 
 if __name__ == "__main__":

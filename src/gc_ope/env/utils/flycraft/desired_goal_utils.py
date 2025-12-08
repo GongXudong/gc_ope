@@ -41,6 +41,20 @@ def get_all_possible_dgs(env: Union[FlyCraftEnv], step_v: float=10, step_mu: flo
     return all_dgs
 
 
+def get_all_possible_dgs_and_dV(env: Union[FlyCraftEnv], step_list: list[float] = [10.0, 2.0, 2.0]) -> tuple[list[tuple], float]:
+    """以step为间隔，在desired goal space中生成所有可能的goal。
+    
+    Returns:
+        tuple[list[tuple], float]: 目标集合，间隔体积
+    """
+    assert len(step_list) == 3
+
+    all_dgs = get_all_possible_dgs(env=env, step_v=step_list[0], step_mu=step_list[1], step_chi=step_list[2])
+    dV = step_list[0] * step_list[1] * step_list[2]
+
+    return all_dgs, dV
+
+
 def reset_env_with_desired_goal(
     env: Union[FlyCraftEnv, gym.Wrapper],
     desired_goal: np.ndarray,

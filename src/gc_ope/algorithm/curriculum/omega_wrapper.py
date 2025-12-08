@@ -16,6 +16,7 @@ class OMEGAWrapper(MEGAWrapper):
         kde_data_discounted_factor: float=0.9,
         sample_dg_method: Literal["rig", "discern", "mega"] = "mega",
         b_used_in_omega: float=-3.0,  # Hyper-parameter used in OMEGA, refer to the Algorithm 2 in "Maximum Entropy Gain Exploration for Long Horizon Multi-Goal Reinforcement Learning"
+        eval_kl_u_p_args: dict={},
     ):
         super().__init__(
             env=env,
@@ -27,6 +28,42 @@ class OMEGAWrapper(MEGAWrapper):
         )
 
         self.b_used_in_omega = b_used_in_omega
+        self.eval_kl_u_p_args = eval_kl_u_p_args
+
+        self.kl_value = 1e8  # 初始化为一个大数
+        self.alpha = 0.0
+
+    def estimate_p_ag(self):
+        if self.need_re_estimate_p_ag_flag:
+            super().estimate_p_ag()
+    
+            # 计算KL(p_dg | p_ag)
+            all_dgs, dV = desired_goal_utils.get_all_possible_dgs_and_dV(
+                env=self.env,
+                step_list=self.eval_kl_u_p_args.get("step_list", None),
+            )
+
+            self.kl_value = self.estimator.kl_divergence_uniform_to_kde_integrate(
+                samples=all_dgs,
+                dV=dV,
+                u_density=1.0 / desired_goal_utils.get_desired_goal_space_volumn(env=self.env),
+            )
+
+            # 计算alpha
+            self.alpha = 1 / np.max([self.b_used_in_omega + self.kl_value, 1])
+
+            print(f"\033[34m calc in env: KL(p_dg, p_ag)={self.kl_value}, alpha={self.alpha}\033[0m")
+
+    def get_info_to_log(self):
+        
+        self.estimate_p_ag()
+        
+        print(f"\033[34m retrieving info from env: KL(p_dg, p_ag)={self.kl_value}, alpha={self.alpha}\033[0m")
+        
+        return {
+            "KL[p_dg|p_ag]": self.kl_value,
+            "alpha": self.alpha,
+        }
 
     def sample_goal(self):
         """先估计p_{ag}，然后根据p_{ag}使用MEGA/RIG/DISCERN中的一种方法采样desired goal
@@ -46,20 +83,12 @@ class OMEGAWrapper(MEGAWrapper):
 
             self.estimate_p_ag()
 
-            # TODO: 计算KL(p_dg | p_ag)
-            kl_value = self.estimator.kl_divergence_uniform_to_kde_integrate(
-                samples=desired_goal_utils.
-            )
-
-            # 计算alpha
-            alpha = 1 / np.max(self.b_used_in_omega + kl_value, 1)
-
             # 根据alpha判断如何采样desired goal
             tmp = np.random.rand()
 
-            if tmp < alpha:
+            if tmp < self.alpha:
                 desired_goal = desired_goal_utils.sample_a_desired_goal(self.env)
-                print(f"\033[34m sample from omega random: {desired_goal}\033[0m, with KL(p_dg, p_ag)={kl_value}, alpha={alpha}")
+                print(f"\033[34m sample from omega random: {desired_goal}\033[0m, with KL(p_dg, p_ag)={self.kl_value}, alpha={self.alpha}")
 
                 return desired_goal
             else:

@@ -22,25 +22,46 @@ def test_kl_divergence_uniform_to_kde_integrate():
         config_path="../../../configs/train",
         config_name="config",
     )
-    cfg.env.env_id = "MyReachSparse-v0"
-
-    cfg.env.train_env.num_process = 2
-    cfg.env.evaluation_env.num_process = 1
-    cfg.env.callback_env.num_process = 1
-
-    cfg.env.train_env.seed = 123
+    cfg.env = dict(
+        env_id = "MyAntMaze_Medium_Diverse_G-v3",
+        continuing_task = False,
+        reward_type = "sparse",
+        maze_map = [
+            [1, 1, 1, 1, 1, 1, 1, 1],
+            [1, "r", "g", 1, 1, "g", "g", 1],
+            [1, "g", "g", 1, "g", "g", "g", 1],
+            [1, 1, "g", "g", "g", 1, 1, 1],
+            [1, "g", "g", 1, "g", "g", "g", 1],
+            [1, "g", 1, "g", "g", 1, "g", 1],
+            [1, "g", "g", "g", 1, "g", "g", 1],
+            [1, 1, 1, 1, 1, 1, 1, 1],
+        ],
+        train_env = dict(
+            num_process=2,
+            seed=3,
+        ),
+        evaluation_env = dict(
+            num_process=2,
+            seed=3,
+        ),
+        callback_env = dict(
+            num_process=2,
+            seed=3,
+        ),
+        env_str = "my_antmaze",
+    )
     
     env = get_env(env_cfg=cfg.env)
     print(env)
 
-    for idx in range(10000, 1000001, 10000):
+    for idx in range(100000, 10000001, 100000):
         # 加载评估数据集
-        eval_res_file = f"checkpoints/myreach/easy/sac/seed_1/rl_model_{idx}_steps_eval_res_on_fixed.csv"
+        eval_res_file = f"checkpoints/my_antmaze_u/sac/seed_1/rl_model_{idx}_steps_eval_res_on_fixed.csv"
 
         # 初始化评估器
         kde_estimator = get_kde_estimator_for_eval_res(
             res_dir=eval_res_file,
-            goal_keys_in_csv=["x", "y", "z"],
+            goal_keys_in_csv=["x", "y"],
         )
 
         # for i in range(len(kde_estimator.eval_res_container.success_list)):
@@ -53,8 +74,8 @@ def test_kl_divergence_uniform_to_kde_integrate():
 
             print(
                 kde_estimator.kl_divergence_uniform_to_kde_integrate(
-                    samples=desired_goal_utils.get_all_possible_dgs(env, step_x=0.02, step_y=0.02, step_z=0.02),
-                    dV=0.02 * 0.02 * 0.02,
+                    samples=desired_goal_utils.get_all_possible_dgs(env, n=5),
+                    dV=0.1 * 0.1,
                     u_density=1.0 / desired_goal_utils.get_desired_goal_space_volumn(env),
                 )
             )
@@ -74,18 +95,40 @@ def test_kl_divergence_uniform_to_kde_integrate_with_mock_uniform_evaluation_dat
         config_path="../../../configs/train",
         config_name="config",
     )
-    cfg.env.env_id = "MyReachSparse-v0"
 
-    cfg.env.train_env.num_process = 2
-    cfg.env.evaluation_env.num_process = 1
-    cfg.env.callback_env.num_process = 1
-
-    cfg.env.train_env.seed = 123
+    cfg.env = dict(
+        env_id = "MyAntMaze_Medium_Diverse_G-v3",
+        continuing_task = False,
+        reward_type = "sparse",
+        maze_map = [
+            [1, 1, 1, 1, 1, 1, 1, 1],
+            [1, "r", "g", 1, 1, "g", "g", 1],
+            [1, "g", "g", 1, "g", "g", "g", 1],
+            [1, 1, "g", "g", "g", 1, 1, 1],
+            [1, "g", "g", 1, "g", "g", "g", 1],
+            [1, "g", 1, "g", "g", 1, "g", 1],
+            [1, "g", "g", "g", 1, "g", "g", 1],
+            [1, 1, 1, 1, 1, 1, 1, 1],
+        ],
+        train_env = dict(
+            num_process=2,
+            seed=3,
+        ),
+        evaluation_env = dict(
+            num_process=2,
+            seed=3,
+        ),
+        callback_env = dict(
+            num_process=2,
+            seed=3,
+        ),
+        env_str = "my_antmaze",
+    )
     
     env = get_env(env_cfg=cfg.env)
     print(env)
 
-    all_dgs = desired_goal_utils.get_all_possible_dgs(env, step_x=0.02, step_y=0.02, step_z=0.02)
+    all_dgs = desired_goal_utils.get_all_possible_dgs(env, n=5)
     print(f"desired goal num: {len(all_dgs)}")
 
     kde_estimator = KDEEvaluator(
@@ -97,7 +140,7 @@ def test_kl_divergence_uniform_to_kde_integrate_with_mock_uniform_evaluation_dat
         kde_kernel="gaussian",
     )
 
-    all_dgs = all_dgs[:3000]
+    all_dgs = all_dgs[:300]
 
     kde_estimator.eval_res_container.add_batch(
         desired_goal_batch=all_dgs,
@@ -111,16 +154,16 @@ def test_kl_divergence_uniform_to_kde_integrate_with_mock_uniform_evaluation_dat
 
     print("KL(u, p) =",
         kde_estimator.kl_divergence_uniform_to_kde_integrate(
-            samples=desired_goal_utils.get_all_possible_dgs(env, step_x=0.02, step_y=0.02, step_z=0.02),
-            dV=0.02 * 0.02 * 0.02,
+            samples=desired_goal_utils.get_all_possible_dgs(env, n=5),
+            dV=np.pow(2 * env.unwrapped.position_noise_range * env.unwrapped.maze.maze_size_scaling / 5, 2),
             u_density=1.0 / desired_goal_utils.get_desired_goal_space_volumn(env),
         )
     )
 
-    # 前1000个dg -> KL(u, p) = 19.60
-    # 前2000个dg -> KL(u, p) = 1.78
-    # 前3000个dg -> KL(u, p) = 0.41
-    # 所有dg     -> KL(u, p) = 0.28
+    # 前100个dg -> KL(u, p) = 12.28
+    # 前200个dg -> KL(u, p) = 9.22
+    # 前300个dg -> KL(u, p) = 0.95
+    # 所有dg     -> KL(u, p) = 0.027
 
 
 if __name__ == "__main__":

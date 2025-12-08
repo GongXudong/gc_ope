@@ -87,6 +87,44 @@ def test_get_all_possible_dgs():
     print(len(all_dgs))
 
 
+def test_get_all_possible_dgs_and_dV():
+    print("test get all possible dgs and dV:")
+
+    cfg = load_config(
+        config_path="../../../configs/train",
+        config_name="config",
+    )
+
+    cfg.env.env_id = "FlyCraft-v0"
+
+    env = get_env(cfg.env)
+    
+    all_dgs, dV = flycraft_desired_goal_utils.get_all_possible_dgs_and_dV(env)
+    print(len(all_dgs), dV, np.array(all_dgs))
+
+    all_dgs, dV = flycraft_desired_goal_utils.get_all_possible_dgs_and_dV(env, step_list=[10.0, 2.0, 2.0])
+    print(len(all_dgs), dV, np.array(all_dgs))
+
+
+def test_get_all_possible_dgs_and_dV_common():
+    print("test get all possible dgs:")
+
+    cfg = load_config(
+        config_path="../../../configs/train",
+        config_name="config",
+    )
+
+    cfg.env.env_id = "FlyCraft-v0"
+
+    env = get_env(cfg.env)
+    
+    all_dgs, dV = common_desired_goal_utils.get_all_possible_dgs_and_dV(env)
+    print(len(all_dgs), dV, np.array(all_dgs))
+
+    all_dgs, dV = common_desired_goal_utils.get_all_possible_dgs_and_dV(env, step_list=[10.0, 2.0, 2.0])
+    print(len(all_dgs), dV, np.array(all_dgs))
+
+
 @pytest.mark.parametrize(
     "test_pkg",
     [("flycraft"), ("common")],
@@ -163,3 +201,6 @@ if __name__ == "__main__":
     test_get_all_possible_dgs()
     test_reset_env_with_desired_goal("common")
     test_get_desired_goal_space_volumn("common")
+
+    test_get_all_possible_dgs_and_dV()
+    test_get_all_possible_dgs_and_dV_common()

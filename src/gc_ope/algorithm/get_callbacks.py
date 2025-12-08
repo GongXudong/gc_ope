@@ -44,6 +44,8 @@ def get_callback_list(
                 render=False,
                 sync_success_stat=cfg.sync_success_stat,
                 sync_success_stat_env_method_name=cfg.sync_success_stat_env_method_name,
+                retrieve_info_from_env=cfg.retrieve_info_from_env,
+                retrieve_info_from_env_method_name=cfg.retrieve_info_from_env_method_name,
                 training_envs=training_envs,
             )
             callback_list.append(my_eval_callback_stat)

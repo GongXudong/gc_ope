@@ -8,6 +8,7 @@ from stable_baselines3.common.utils import set_random_seed
 from flycraft.env import FlyCraftEnv
 
 from gc_ope.algorithm.curriculum.mega_wrapper import MEGAWrapper
+from gc_ope.algorithm.curriculum.omega_wrapper import OMEGAWrapper
 from gc_ope.env.utils.flycraft.my_wrappers import ScaledActionWrapper, ScaledObservationWrapper
 
 
@@ -36,6 +37,8 @@ def make_env(rank: int, seed: int = 0, **kwargs):
 
             if curriculum_method == "mega":
                 curriculum_wrapper_class = MEGAWrapper
+            elif curriculum_method == "omega":
+                curriculum_wrapper_class = OMEGAWrapper
             else:
                 raise ValueError(f"Can not process curriculum method: {curriculum_method}!")
 

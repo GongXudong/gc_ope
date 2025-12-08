@@ -46,3 +46,9 @@ class SyncEvaluationResultWrapper(Wrapper):
         )
 
         self.after_sync_evaluation_stat_hook()
+
+
+    def get_info_to_log(self) -> dict:
+        """从环境中获得关键数据，记录在sb3的logger中
+        """
+        return {}

@@ -7,7 +7,7 @@
   success_key_in_info: is_success
   sync_success_stat: true
   sync_success_stat_env_method_name: sync_evaluation_stat
-  retrieve_info_from_env: false
+  retrieve_info_from_env: true
   retrieve_info_from_env_method_name: get_info_to_log
 - type: EveryNTimesteps_SaveCheckpoints  # 周期性保存ckpt
   save_freq: 1

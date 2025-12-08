@@ -15,7 +15,9 @@ from gc_ope.env.utils.my_reach import desired_goal_utils as reach_desired_goal_u
 from gc_ope.env.utils.my_push import desired_goal_utils as push_desired_goal_utils
 
 
-def sample_a_desired_goal(env: Union[FlyCraftEnv, MyPointMazeEnv, MyAntMazeEnv, MyPandaReachEnv, MyPandaPushEnv, MyPandaSlideEnv, gym.Wrapper]) -> np.ndarray:
+def sample_a_desired_goal(
+    env: Union[FlyCraftEnv, MyPointMazeEnv, MyAntMazeEnv, MyPandaReachEnv, MyPandaPushEnv, MyPandaSlideEnv, gym.Wrapper]
+) -> np.ndarray:
     """根据环境原有的采样目标方法，采样一个desired_goal
 
     Args:
@@ -39,7 +41,10 @@ def sample_a_desired_goal(env: Union[FlyCraftEnv, MyPointMazeEnv, MyAntMazeEnv, 
         raise ValueError(f"Can not process env: {env_id}!")
 
 
-def get_all_possible_dgs(env: Union[FlyCraftEnv, MyPointMazeEnv, MyAntMazeEnv, MyPandaReachEnv, MyPandaPushEnv, MyPandaSlideEnv, gym.Wrapper], **kwargs) -> list[tuple]:
+def get_all_possible_dgs(
+    env: Union[FlyCraftEnv, MyPointMazeEnv, MyAntMazeEnv, MyPandaReachEnv, MyPandaPushEnv, MyPandaSlideEnv, gym.Wrapper],
+    **kwargs
+) -> list[tuple]:
 
     env_id = env.unwrapped.spec.id
 
@@ -53,6 +58,42 @@ def get_all_possible_dgs(env: Union[FlyCraftEnv, MyPointMazeEnv, MyAntMazeEnv, M
         return maze_desired_goal_utils.generate_all_possible_dgs(env=env, n=kwargs["n"])
     else:
         raise ValueError(f"Can not process env: {env_id}!")
+
+
+def get_all_possible_dgs_and_dV(
+    env: Union[FlyCraftEnv, MyPointMazeEnv, MyAntMazeEnv, MyPandaReachEnv, MyPandaPushEnv, MyPandaSlideEnv, gym.Wrapper],
+    step_list: list[float] = None,
+) -> tuple[list[tuple], float]:
+    """以step为间隔，在desired goal space中生成所有可能的goal。
+    
+    Returns:
+        tuple[list[tuple], float]: 目标集合，间隔体积
+    """
+
+    env_id = env.unwrapped.spec.id
+
+    # 准备step_list的默认值
+    if step_list is None:
+        if env_id.startswith("FlyCraft"):
+            step_list = [10.0, 2.0, 2.0]
+        elif env_id.startswith("MyReach") or env_id.startswith("MyPush") or env_id.startswith("MySlide"):
+            step_list = [0.02, 0.02, 0.02]
+        elif env_id.startswith("MyPointMaze") or env_id.startswith("MyAntMaze"):
+            step_list = [5]
+        else:
+            raise ValueError(f"Can not process env: {env_id}!")
+
+    if env_id.startswith("FlyCraft"):
+        return flycraft_desired_goal_utils.get_all_possible_dgs_and_dV(env=env, step_list=step_list)
+    elif env_id.startswith("MyReach"):
+        return reach_desired_goal_utils.get_all_possible_dgs_and_dV(env=env, step_list=step_list)
+    elif env_id.startswith("MyPush") or env_id.startswith("MySlide"):
+        return push_desired_goal_utils.get_all_possible_dgs_and_dV(env=env, step_list=step_list)
+    elif env_id.startswith("MyPointMaze") or env_id.startswith("MyAntMaze"):
+        return maze_desired_goal_utils.get_all_possible_dgs_and_dV(env=env, step_list=step_list)
+    else:
+        raise ValueError(f"Can not process env: {env_id}!")
+
 
 def reset_env_with_desired_goal(
     env: Union[FlyCraftEnv, MyPointMazeEnv, MyAntMazeEnv, MyPandaReachEnv, MyPandaPushEnv, MyPandaSlideEnv, gym.Wrapper],
@@ -84,7 +125,9 @@ def reset_env_with_desired_goal(
         raise ValueError(f"Can not process env: {env_id}!")
 
 
-def get_desired_goal_space_volumn(env: Union[FlyCraftEnv, MyPointMazeEnv, MyAntMazeEnv, MyPandaReachEnv, MyPandaPushEnv, MyPandaSlideEnv, gym.Wrapper]) -> float:
+def get_desired_goal_space_volumn(
+    env: Union[FlyCraftEnv, MyPointMazeEnv, MyAntMazeEnv, MyPandaReachEnv, MyPandaPushEnv, MyPandaSlideEnv, gym.Wrapper]
+) -> float:
     """计算desired_goal空间的体积
     """
     env_id = env.unwrapped.spec.id

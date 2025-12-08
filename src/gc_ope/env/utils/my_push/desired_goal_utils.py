@@ -18,7 +18,7 @@ def sample_a_desired_goal(env: Union[PandaPushEnv, PandaSlideEnv, gym.Wrapper]) 
     return env.unwrapped.task._sample_goal()
 
 
-def get_all_possible_dgs(env: Union[PandaPushEnv, PandaSlideEnv], step_x: float=0.05, step_y: float=0.05, step_z: float=0.05) -> list[tuple]:
+def get_all_possible_dgs(env: Union[PandaPushEnv, PandaSlideEnv], step_x: float=0.02, step_y: float=0.02, step_z: float=0.02) -> list[tuple]:
     """以step为间隔，在desired goal space中生成所有可能的goal。
 
     适用于Push和Slide（只有x、y两个维度需要枚举，z是固定值）。
@@ -38,6 +38,22 @@ def get_all_possible_dgs(env: Union[PandaPushEnv, PandaSlideEnv], step_x: float=
 
     all_dgs = list(itertools.product(xs, ys, zs))
     return all_dgs
+
+
+def get_all_possible_dgs_and_dV(env: Union[PandaPushEnv, PandaSlideEnv], step_list: list[float] = [0.02, 0.02, 0.02]) -> tuple[list[tuple], float]:
+    """以step为间隔，在desired goal space中生成所有可能的goal。
+    
+    Returns:
+        tuple[list[tuple], float]: 目标集合，间隔体积
+    """
+
+    assert len(step_list) == 3
+
+    all_dgs = get_all_possible_dgs(env=env, step_x=step_list[0], step_y=step_list[1], step_z=step_list[2])
+
+    dV = step_list[0] * step_list[1]
+
+    return all_dgs, dV
 
 
 def get_random_dgs(env: Union[PandaPushEnv, PandaSlideEnv], num_dg: int) -> list[tuple]:

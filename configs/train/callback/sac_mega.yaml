@@ -7,6 +7,8 @@
   success_key_in_info: is_success
   sync_success_stat: true
   sync_success_stat_env_method_name: sync_evaluation_stat
+  retrieve_info_from_env: false
+  retrieve_info_from_env_method_name: get_info_to_log
 - type: EveryNTimesteps_SaveCheckpoints  # 周期性保存ckpt和replay_buffer
   save_freq: 1
   save_path: checkpoints/${env.env_str}/${experiment_name}

@@ -41,10 +41,35 @@ def test_sample_a_desired_goal_1(test_pkg: Literal["my_pointmaze", "common"]):
 
 def test_generate_all_possible_dgs(n):
     print("In test generate all possible dgs:")
+    
     env = gym.make("MyPointMaze_Large_Diverse_G-v3")
 
     all_dgs = my_pointmaze_desired_goal_utils.generate_all_possible_dgs(env=env.unwrapped, n=n)
     print(all_dgs)
+
+
+def test_get_all_possible_dgs_and_dV():
+    print("test get all possible dgs and dV:")
+
+    env = gym.make("MyPointMaze_Large_Diverse_G-v3")
+    
+    all_dgs, dV = my_pointmaze_desired_goal_utils.get_all_possible_dgs_and_dV(env)
+    print(len(all_dgs), dV, np.array(all_dgs))
+
+    all_dgs, dV = my_pointmaze_desired_goal_utils.get_all_possible_dgs_and_dV(env, step_list=[5])
+    print(len(all_dgs), dV, np.array(all_dgs))
+
+
+def test_get_all_possible_dgs_and_dV_common():
+    print("test get all possible dgs:")
+
+    env = gym.make("MyPointMaze_Large_Diverse_G-v3")
+    
+    all_dgs, dV = common_desired_goal_utils.get_all_possible_dgs_and_dV(env)
+    print(len(all_dgs), dV, np.array(all_dgs))
+
+    all_dgs, dV = common_desired_goal_utils.get_all_possible_dgs_and_dV(env, step_list=[5])
+    print(len(all_dgs), dV, np.array(all_dgs))
 
 
 @pytest.mark.parametrize(
@@ -102,3 +127,6 @@ if __name__ == "__main__":
     test_reset_env_with_desired_goal("common")
     test_get_desired_goal_space_volumn("common")
     test_generate_all_possible_dgs(2)
+
+    test_get_all_possible_dgs_and_dV()
+    test_get_all_possible_dgs_and_dV_common()

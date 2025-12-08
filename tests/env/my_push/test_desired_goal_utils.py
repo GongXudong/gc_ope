@@ -38,6 +38,30 @@ def test_get_all_possible_dgs():
     print(len(all_dgs), np.array(all_dgs))
 
 
+def test_get_all_possible_dgs_and_dV():
+    print("test get all possible dgs and dV:")
+
+    env = gym.make("MyPushSparse-v0")
+    
+    all_dgs, dV = my_push_desired_goal_utils.get_all_possible_dgs_and_dV(env)
+    print(len(all_dgs), dV, np.array(all_dgs))
+
+    all_dgs, dV = my_push_desired_goal_utils.get_all_possible_dgs_and_dV(env, step_list=[0.02, 0.02, 0.02])
+    print(len(all_dgs), dV, np.array(all_dgs))
+
+
+def test_get_all_possible_dgs_and_dV_common():
+    print("test get all possible dgs:")
+
+    env = gym.make("MyPushSparse-v0")
+    
+    all_dgs, dV = common_desired_goal_utils.get_all_possible_dgs_and_dV(env)
+    print(len(all_dgs), dV, np.array(all_dgs))
+
+    all_dgs, dV = common_desired_goal_utils.get_all_possible_dgs_and_dV(env, step_list=[0.02, 0.02, 0.02])
+    print(len(all_dgs), dV, np.array(all_dgs))
+
+
 def test_get_random_dgs():
     print("In test get random dgs:")
 
@@ -105,3 +129,6 @@ if __name__ == "__main__":
     test_get_random_dgs()
     test_reset_env_with_desired_goal("common")
     test_get_desired_goal_space_volumn("common")
+
+    test_get_all_possible_dgs_and_dV()
+    test_get_all_possible_dgs_and_dV_common()

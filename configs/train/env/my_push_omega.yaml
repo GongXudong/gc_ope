@@ -1,0 +1,24 @@
+env_id: MyPushSparse-v0
+# begin: curriculum
+use_curriculum: true
+curriculum_method: omega
+curriculum_kwargs:
+  sample_n: 10
+  kde_kernel: gaussian
+  kde_bandwidth: 0.2
+  kde_data_discounted_factor: 0.9
+  sample_dg_method: mega
+  b_used_in_omega: -3
+  eval_kl_u_p_args:
+    step_list: [0.02, 0.02, 0.02]
+# end: curriculum
+train_env:  # 训练中的VecEnv配置
+  num_process: 1
+  seed: 3
+evaluation_env:  # 评估中的VecEnv配置
+  num_process: 16
+  seed: 6
+callback_env:  # Callback中的VecEnv配置
+  num_process: 16
+  seed: 7
+env_str: my_push

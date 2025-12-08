@@ -1,0 +1,37 @@
+env_id: MyPointMaze_Large_Diverse_G-v3
+maze_map: [
+  [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+  [1, "r", "g", "g", "g", 1, "g", "g", "g", "g", "g", 1],
+  [1, "g", 1, 1, "g", 1, "g", 1, "g", 1, "g", 1],
+  [1, "g", "g", "g", "g", "g", "g", 1, "g", "g", "g", 1],
+  [1, "g", 1, 1, 1, 1, "g", 1, 1, 1, "g", 1],
+  [1, "g", "g", 1, "g", 1, "g", "g", "g", "g", "g", 1],
+  [1, 1, "g", 1, "g", 1, "g", 1, "g", 1, 1, 1],
+  [1, "g", "g", 1, "g", "g", "g", 1, "g", "g", "g", 1],
+  [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+]
+reward_type: dense
+continuing_task: false
+# begin: curriculum
+use_curriculum: true
+curriculum_method: omega
+curriculum_kwargs:
+  sample_n: 10
+  kde_kernel: gaussian
+  kde_bandwidth: 0.2
+  kde_data_discounted_factor: 0.9
+  sample_dg_method: mega
+  b_used_in_omega: -3
+  eval_kl_u_p_args:
+    step_list: [5]
+# end: curriculum
+train_env:  # 训练中的VecEnv配置
+  num_process: 1
+  seed: 3
+evaluation_env:  # 评估中的VecEnv配置
+  num_process: 16
+  seed: 6
+callback_env:  # Callback中的VecEnv配置
+  num_process: 16
+  seed: 7
+env_str: my_pointmaze_dense

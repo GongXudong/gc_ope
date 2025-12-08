@@ -16,6 +16,7 @@ from gc_ope.env.utils.my_slide.register_env import register_my_slide
 from gc_ope.env.utils.my_maze.register_env import register_my_point_maze, register_my_ant_maze
 # from gc_ope.env.utils.pointmaze.vec_env_helper import make_env as make_pointmaze_env
 from gc_ope.algorithm.curriculum.mega_wrapper import MEGAWrapper
+from gc_ope.algorithm.curriculum.omega_wrapper import OMEGAWrapper
 
 
 gym.register_envs(flycraft)

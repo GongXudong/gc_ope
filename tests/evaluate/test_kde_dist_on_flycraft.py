@@ -6,6 +6,8 @@ import numpy as np
 import gymnasium as gym
 from gc_ope.env.get_env import get_env
 from gc_ope.env.utils import desired_goal_utils
+from gc_ope.evaluate.evaluation_result_container import WeightedEvaluationResultContainer
+from gc_ope.evaluate.evaluator_kde import KDEEvaluator
 from gc_ope.evaluate.utils.get_kde_estimator import get_kde_estimator_for_eval_res
 from gc_ope.utils.load_config_with_hydra import load_config
 
@@ -115,6 +117,69 @@ def test_kl_divergence_uniform_to_kde_integrate():
             # print(b)
 
 
+def test_kl_divergence_uniform_to_kde_integrate_with_mock_uniform_evaluation_data():
+    """生成mock测试数据，desired goal按固定间隔在整个目标空间采样，假设全部是成功的（模拟p_ag是在目标空间上的均匀分布的情况）
+    此时，检测KL(u, p)的值是否接近于0
+    """
+    
+    print("In test kl divergence uniform to kde integrate with mock uniform evaluation data:")
+
+
+    cfg = load_config(
+        config_path="../../../configs/train",
+        config_name="config",
+    )
+    cfg.env.env_id = "FlyCraft-v0"
+    cfg.env.config_file = "configs/env_configs/flycraft/env_config_for_ppo_easy.json"
+
+    cfg.env.train_env.num_process = 2
+    cfg.env.evaluation_env.num_process = 1
+    cfg.env.callback_env.num_process = 1
+
+    cfg.env.train_env.seed = 123
+    
+    env = get_env(env_cfg=cfg.env)
+    print(env)
+
+    all_dgs = desired_goal_utils.get_all_possible_dgs(env, step_v=10, step_mu=2, step_chi=2)
+    print(f"desired goal num: {len(all_dgs)}")
+
+    kde_estimator = KDEEvaluator(
+        evaluation_result_container_class=WeightedEvaluationResultContainer,
+        evaluation_result_container_kwargs=dict(
+            discounted_factor=0.9,
+        ),
+        kde_bandwidth=1.0,
+        kde_kernel="gaussian",
+    )
+
+    all_dgs = all_dgs[:]
+
+    kde_estimator.eval_res_container.add_batch(
+        desired_goal_batch=all_dgs,
+        success_batch=[True] * len(all_dgs),
+        cumulative_reward_batch=[1.0] * len(all_dgs),
+        discounted_cumulative_reward_batch=[1.0] * len(all_dgs),
+        desired_goal_weight_batch=[1.0] * len(all_dgs),
+    )
+
+    dgs_for_eval_res, scaled_dgs_for_eval_res, dg_weights_for_eval_res, dg_densities_for_eval_res = kde_estimator.fit_evaluator()
+
+    print("KL(u, p) =",
+        kde_estimator.kl_divergence_uniform_to_kde_integrate(
+            samples=desired_goal_utils.get_all_possible_dgs(env, step_v=10, step_mu=2, step_chi=2),
+            dV=10*2*2,
+            u_density=1.0 / desired_goal_utils.get_desired_goal_space_volumn(env),
+        )
+    )
+
+    # 前1000个dg -> KL(u, p) = 16.91
+    # 前2000个dg -> KL(u, p) = 1.34
+    # 前3000个dg -> KL(u, p) = 0.39
+    # 所有dg     -> KL(u, p) = 0.33
+
+
 if __name__ == "__main__":
     # test_kl_divergence_uniform_to_kde_monte_carlo()
-    test_kl_divergence_uniform_to_kde_integrate()
+    # test_kl_divergence_uniform_to_kde_integrate()
+    test_kl_divergence_uniform_to_kde_integrate_with_mock_uniform_evaluation_data()

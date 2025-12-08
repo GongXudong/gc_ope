@@ -1,0 +1,34 @@
+env_id: FlyCraft-v0
+config_file: configs/env_configs/flycraft/env_config_for_sac_easy.json
+# begin: curriculum
+use_curriculum: true
+curriculum_method: omega
+curriculum_kwargs:
+  sample_n: 10
+  kde_kernel: gaussian
+  kde_bandwidth: 0.2
+  kde_data_discounted_factor: 0.9
+  sample_dg_method: mega
+  b_used_in_omega: -3
+  eval_kl_u_p_args:
+    step_list: [10.0, 2.0, 2.0]
+# end: curriculum
+train_env:  # 训练中的VecEnv配置
+  num_process: 1
+  seed: 3
+  custom_config:
+    debug_mode: true
+    flag_str: Train
+evaluation_env:  # 评估中的VecEnv配置
+  num_process: 16
+  seed: 6
+  custom_config:
+    debug_mode: false
+    flag_str: Evaluation
+callback_env:  # Callback中的VecEnv配置
+  num_process: 16
+  seed: 7
+  custom_config:
+    debug_mode: false
+    flag_str: Callback
+env_str: flycraft

@@ -287,8 +287,10 @@ class MyEvalCallbackSTAT(EventCallback):
         render: bool = False,
         verbose: int = 1,
         warn: bool = True,
-        sync_success_stat: bool = True,
+        sync_success_stat: bool = True,  # 向环境发送评估信息
         sync_success_stat_env_method_name: str = "sync_evaluation_stat",
+        retrieve_info_from_env: bool = False,  # 从环境提取信息，用于sb3.logger记录
+        retrieve_info_from_env_method_name: str = "get_info_to_log",
         training_envs: SubprocVecEnv = None,
     ):
         super().__init__(callback_after_eval, verbose=verbose)
@@ -329,6 +331,9 @@ class MyEvalCallbackSTAT(EventCallback):
 
         self.sync_success_stat = sync_success_stat
         self.sync_success_stat_env_method_name = sync_success_stat_env_method_name
+
+        self.retrieve_info_from_env = retrieve_info_from_env
+        self.retrieve_info_from_env_method_name = retrieve_info_from_env_method_name
 
         self.training_envs: SubprocVecEnv = training_envs
 
@@ -408,6 +413,12 @@ class MyEvalCallbackSTAT(EventCallback):
             if self.sync_success_stat:
                 # self.training_envs.env_is_wrapped
                 self.training_envs.env_method(self.sync_success_stat_env_method_name, tmp_stat_list)
+
+            # 从环境读取信息，并用sb3.logger记录
+            if self.retrieve_info_from_env:
+                tmp_info_dict = self.training_envs.env_method(self.retrieve_info_from_env_method_name, indices=[0])[0]
+                for tmp_key, tmp_value in tmp_info_dict.items():
+                    self.logger.record(f"env/{tmp_key}", tmp_value)
 
             # print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
             # print(self.stat_success_dict)
