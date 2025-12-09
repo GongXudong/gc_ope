@@ -19,7 +19,9 @@ def get_kde_estimator_for_replay_buffer(
 ) -> KDEEvaluator:
 
     replay_buffer = load_from_pkl(PROJECT_ROOT_DIR / replay_buffer_path)
-    achieved_goals = replay_buffer.observations["achieved_goal"].squeeze()
+
+    # replay_buffer.observations原本的维度是(step_num, env_num, goal_dim)，将其维度转换为(step_num * env_num, goal_dim)
+    achieved_goals = replay_buffer.observations["achieved_goal"].reshape((-1, replay_buffer.observations["achieved_goal"].shape[-1]))
 
     kde_evaluator_for_replay_buffer = KDEEvaluator(
         evaluation_result_container_class=WeightedEvaluationResultContainer,
@@ -32,7 +34,7 @@ def get_kde_estimator_for_replay_buffer(
 
     random_index = np.random.randint(
         low=0,
-        high=achieved_goals.shape[0],
+        high=replay_buffer.size(),
         size=sample_num_for_replay_buffer,
     )
 
