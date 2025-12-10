@@ -47,12 +47,11 @@ class SyncEvaluationResultWrapper(Wrapper):
 
         self.after_sync_evaluation_stat_hook()
 
-
     def reset_evaluation_result_container(self):
-        """重置评估数据容器(清空容器内的数据)
+        """重置评估数据容器(清空容器内的数据) 
         """
+        print("Check in sync_eval_res_wrapper: reset evaluation result container!")
         self.estimator.eval_res_container.reset()
-
 
     def get_info_to_log(self) -> dict:
         """从环境中获得关键数据，记录在sb3的logger中

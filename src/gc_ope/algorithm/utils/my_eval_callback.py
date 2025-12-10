@@ -3,6 +3,7 @@ import warnings
 from typing import Any, Callable, Dict, List, Optional, Union
 import gymnasium as gym
 import numpy as np
+from copy import deepcopy
 
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecCheckNan
 
@@ -24,6 +25,7 @@ from stable_baselines3.common.callbacks import EventCallback, BaseCallback
 from stable_baselines3.common.utils import polyak_update
 
 from gc_ope.algorithm.utils.my_evaluate_policy import evaluate_policy_with_stat
+from gc_ope.env.utils.flycraft.my_wrappers import ScaledObservationWrapper
 
 
 class MyEvalCallback(EventCallback):
@@ -507,6 +509,11 @@ class MyEvalCallbackSTATFromReplayBuffer(MyEvalCallbackSTAT):
     
     根据最高胜率保存策略，记录过程中每个目标的完成次数。
 
+    初始化时，相比MyEvalCallbackSTAT多了3个参数：
+        1.reset_evaluation_result_container：每次调用callback时是否重置env的评估数据容器
+        2.reset_evaluation_result_container_method_name：重置env的评估数据容器的方法名
+        3.sample_num_from_replay_buffer：每次调用callback时，从replay buffer中取多少数据发送给env的评估数据容器
+
     每次调用_on_step()时，将评估结果发送给env，用于拟合p_ag。
     """
 
@@ -560,6 +567,9 @@ class MyEvalCallbackSTATFromReplayBuffer(MyEvalCallbackSTAT):
         # 从Replay Buffer中抽取的样本数（用于估计p_ag）
         self.sample_num_from_replay_buffer = sample_num_from_replay_buffer
 
+        self.env_id = training_envs.get_attr("spec", indices=[0])[0].id
+        print(f"Check in init callback, env_id = {self.env_id}")
+
     def _on_step(self) -> bool:
         continue_training = True
 
@@ -607,15 +617,39 @@ class MyEvalCallbackSTATFromReplayBuffer(MyEvalCallbackSTAT):
 
             tmp_stat_list = []
 
+            # TODO: 只调用一次env_method
+
             for item in achieved_goals[random_index]:
-                tmp_stat_list.append({
-                    "desired_goal": item,
-                    "success": True,
-                    "cumulative_reward": 1.0,
-                })
-            
+                # TODO: 根据env_id分类处理
+
+                if self.env_id.find("FlyCraft") != -1:
+                    if self.training_envs.env_is_wrapped(ScaledObservationWrapper, indices=[0])[0]:
+                        original_obs = self.training_envs.env_method(
+                            "inverse_scale_state", 
+                            indices=[0],
+                            state_var={
+                                "desired_goal": deepcopy(item), # 随便取一个
+                                "achieved_goal": deepcopy(item),
+                                "observation": deepcopy(replay_buffer.observations["observation"][0, 0]),  # 随便取一个
+                            },
+                        )[0]
+
+                        # print(f"original obs: {item}, inverse_scaled_obs: {original_obs["achieved_goal"]}")
+
+                        tmp_stat_list.append({
+                            "desired_goal": original_obs["achieved_goal"],
+                            "success": True,
+                            "cumulative_reward": 1.0,
+                        })
+                else:
+                    tmp_stat_list.append({
+                        "desired_goal": item,
+                        "success": True,
+                        "cumulative_reward": 1.0,
+                    })
+
             # self.logger.info()
-            print(f"check read from replay buffer, sample {self.sample_num_from_replay_buffer} from replay buffer ({replay_buffer.size()} samples), ids[:10] = {random_index[:10]}")
+            print(f"check in callback: read from replay buffer, sample {self.sample_num_from_replay_buffer} from replay buffer ({replay_buffer.size()} samples), ids[:10] = {random_index[:10]}, achieved_goal[0] from rb = {achieved_goals[random_index[0]]}, achieved_goal[0] to seed: {tmp_stat_list[0]['desired_goal']}")
 
             # 把统计结果同步到训练环境中
             # print("synchronize attributes!!!!!!!!!!!!!!!!")
