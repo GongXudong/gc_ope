@@ -1,0 +1,19 @@
+- type: MyEvalCallbackSTATFromReplayBuffer  # 评估policy的得分能力与任务成功率；改为EvalCallback，则只评估policy的得分能力
+  best_model_save_path: checkpoints/${env.env_str}/${experiment_name}
+  log_path: logs/${env.env_str}/${experiment_name}
+  eval_freq: 10000
+  evaluate_nums_in_callback: 6  # 实际评估的数量为：n_eval_episodes = ${env.callback_env.num_process} * 3
+  deterministic: true
+  success_key_in_info: is_success
+  reset_evaluation_result_container: true
+  reset_evaluation_result_container_method_name: reset_evaluation_result_container
+  sample_num_from_replay_buffer: 1000
+  sync_success_stat: true
+  sync_success_stat_env_method_name: sync_evaluation_stat
+  retrieve_info_from_env: false
+  retrieve_info_from_env_method_name: get_info_to_log
+- type: EveryNTimesteps_SaveCheckpoints  # 周期性保存ckpt和replay_buffer
+  save_freq: 1
+  save_path: checkpoints/${env.env_str}/${experiment_name}
+  save_checkpoint_every_n_timesteps: 10000
+  save_replay_buffer: true
