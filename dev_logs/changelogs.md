@@ -1,7 +1,12 @@
 # GC-OPE
 
-TODO: Add MEGA/OMEGA training.
 TODO: sampling data compatible with scope-rl.
+TODO: training and compare estimating $p_{ag}$ by historical evaluation and replay buffer.
+
+## 2025-12-10
+
+* Add training scripts of MEGA/OMEGA for FlyCraft.
+* Add scripts of estimating $p_{ag}$ with data sampled from replay buffer, and add corresponding training scripts for MEGA/OMEGA.
 
 ## 2025-12-07
 
