@@ -16,9 +16,13 @@
   - [x] 编写训练脚本
     - [x] MEGA
     - [x] OMEGA
-  - [ ] 对比rollout/success_rate和rollout/ep_rew_mean，说明训练中采样到的目标的成功率更高了
+  - [x] 对比rollout/success_rate和rollout/ep_rew_mean，说明训练中采样到的目标的成功率更高了
   - [ ] 记录训练过程中采样到的目标，计算这些目标在$p_{ag}$上的概率，并画出概率图。说明采样到的目标在能力边界
-  - [ ] 计算$D_{KL} (p_{dg}, p_{ag})$，并画出在训练过程中的变化曲线()
+    - [ ] 记录训练过程中收集数据使用的desired goal
+    - [ ] 分析数据（提取desired goal $g$，根据评估数据计算$p_{ag}$，计算$p_{ag}(g)$）、画图
+      - [ ] 写解析*.txt（训练过程的log）的脚本，得到(timesteps, desired_goal)构成的DataFrame
+      - [ ] 对上一步得到的DataFrame，插入一列，$p_{ag}(g)$
+  - [x] 计算$D_{KL} (p_{dg}, p_{ag})$，并画出在训练过程中的变化曲线()
     - [x] 计算$D_{KL} (p_{dg}, p_{ag})$
     - [x] 使用sb3.logger记录$D_{KL} (p_{dg}, p_{ag})$
     - [ ] 根据训练的log数据画图
