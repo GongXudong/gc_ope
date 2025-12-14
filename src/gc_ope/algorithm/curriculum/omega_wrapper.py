@@ -36,23 +36,31 @@ class OMEGAWrapper(MEGAWrapper):
     def estimate_p_ag(self):
         if self.need_re_estimate_p_ag_flag:
             super().estimate_p_ag()
-    
-            # 计算KL(p_dg | p_ag)
-            all_dgs, dV = desired_goal_utils.get_all_possible_dgs_and_dV(
-                env=self.env,
-                step_list=self.eval_kl_u_p_args.get("step_list", None),
-            )
 
-            self.kl_value = self.estimator.kl_divergence_uniform_to_kde_integrate(
-                samples=all_dgs,
-                dV=dV,
-                u_density=1.0 / desired_goal_utils.get_desired_goal_space_volumn(env=self.env),
-            )
+            # 调用super().estimate_p_ag()成功的情况
+            if sum(self.estimator.eval_res_container.success_list) > 0:
+                # 计算KL(p_dg | p_ag)
+                all_dgs, dV = desired_goal_utils.get_all_possible_dgs_and_dV(
+                    env=self.env,
+                    step_list=self.eval_kl_u_p_args.get("step_list", None),
+                )
 
-            # 计算alpha
-            self.alpha = 1 / np.max([self.b_used_in_omega + self.kl_value, 1])
+                self.kl_value = self.estimator.kl_divergence_uniform_to_kde_integrate(
+                    samples=all_dgs,
+                    dV=dV,
+                    u_density=1.0 / desired_goal_utils.get_desired_goal_space_volumn(env=self.env),
+                )
 
-            print(f"\033[34m calc in env: KL(p_dg, p_ag)={self.kl_value}, alpha={self.alpha}\033[0m")
+                # 计算alpha
+                self.alpha = 1 / np.max([self.b_used_in_omega + self.kl_value, 1])
+
+                print(f"\033[34m calc in env: KL(p_dg, p_ag)={self.kl_value}, alpha={self.alpha}\033[0m")
+            else:
+                # 没有数据可以用来评估p_ag
+                self.kl_value = np.inf
+                self.alpha = 0
+
+                print(f"\033[34m calc in env, no data can be used to estimate p_ag: KL(p_dg, p_ag)={self.kl_value}, alpha={self.alpha}\033[0m")
 
     def get_info_to_log(self):
         

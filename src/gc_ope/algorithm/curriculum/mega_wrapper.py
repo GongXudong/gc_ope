@@ -48,12 +48,13 @@ class MEGAWrapper(SyncEvaluationResultWrapper):
 
             print(f"\033[33mCheck in callback: {sum(self.estimator.eval_res_container.success_list)} successful dgs in eval.\033[0m")
 
-            # fit KDE
-            dgs, scaled_dgs, dg_weights, dg_densities = self.estimator.fit_evaluator()
+            if sum(self.estimator.eval_res_container.success_list) > 0:
+                # fit KDE
+                dgs, scaled_dgs, dg_weights, dg_densities = self.estimator.fit_evaluator()
 
-            # get threshold for sampling
-            self.p_ag_density_threshold = np.min(dg_densities)
-            self.need_re_estimate_p_ag_flag = False
+                # get threshold for sampling
+                self.p_ag_density_threshold = np.min(dg_densities)
+                self.need_re_estimate_p_ag_flag = False
 
     def sample_goal(self) -> Union[list, np.ndarray]:
         """先估计p_{ag}，然后根据p_{ag}使用MEGA/RIG/DISCERN中的一种方法采样desired goal
