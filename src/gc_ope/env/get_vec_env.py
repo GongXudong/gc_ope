@@ -110,6 +110,8 @@ def get_my_reach_envs(env_cfg: DictConfig) -> tuple[VecEnv, VecEnv, VecEnv]:
 
         if curriculum_method == "mega":
             curriculum_wrapper_class = MEGAWrapper
+        elif curriculum_method == "omega":
+            curriculum_wrapper_class = OMEGAWrapper
         else:
             raise ValueError(f"Can not process curriculum method: {curriculum_method}!")
 
@@ -157,6 +159,8 @@ def get_my_pointmaze_envs(env_cfg: DictConfig) -> tuple[VecEnv, VecEnv, VecEnv]:
 
         if curriculum_method == "mega":
             curriculum_wrapper_class = MEGAWrapper
+        elif curriculum_method == "omega":
+            curriculum_wrapper_class = OMEGAWrapper
         else:
             raise ValueError(f"Can not process curriculum method: {curriculum_method}!")
 
