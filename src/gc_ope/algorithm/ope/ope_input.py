@@ -96,9 +96,10 @@ def build_ope_inputs(
     eval_actions, eval_log_prob = _ensure_eval_actions(dataset, eval_algo)
 
     device = fqe.device
-    obs_t = th.as_tensor(dataset.obs_flat, device=device)
-    act_t = th.as_tensor(dataset.actions, device=device)
-    eval_act_t = th.as_tensor(eval_actions, device=device)
+    # Convert numpy arrays to tensors and move to device
+    obs_t = th.as_tensor(dataset.obs_flat, device=device, dtype=th.float32)
+    act_t = th.as_tensor(dataset.actions, device=device, dtype=th.float32)
+    eval_act_t = th.as_tensor(eval_actions, device=device, dtype=th.float32)
 
     with th.no_grad():
         q_sa_behavior = fqe.predict_value(obs_t, act_t).cpu().numpy()

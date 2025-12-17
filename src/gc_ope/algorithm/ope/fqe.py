@@ -99,7 +99,16 @@ class FQETrainer:
         hidden_sizes: Sequence[int] = (256, 256),
         device: Optional[str] = None,
     ) -> None:
-        self.device = th.device(device or eval_algo.device)
+        # Determine device: use provided device, or eval_algo.device, or default to cuda if available
+        if device is not None:
+            self.device = th.device(device)
+        else:
+            algo_device = getattr(eval_algo, 'device', None)
+            if algo_device is not None:
+                self.device = th.device(algo_device)
+            else:
+                # Default to cuda if available, otherwise cpu
+                self.device = th.device('cuda' if th.cuda.is_available() else 'cpu')
         self.eval_algo = eval_algo
         self.gamma = gamma
         self.tau = tau
@@ -112,18 +121,20 @@ class FQETrainer:
         """Compute deterministic evaluation policy action.
 
         Args:
-            next_obs: Next state tensor (batch_size, obs_dim).
+            next_obs: Next state tensor (batch_size, obs_dim), should be on self.device.
 
         Returns:
-            Deterministic actions from evaluation policy (batch_size, act_dim).
+            Deterministic actions from evaluation policy (batch_size, act_dim), on self.device.
         """
         policy = self.eval_algo.policy
+        # Convert to policy device for computation, then back to self.device
+        next_obs_policy = next_obs.to(policy.device)
         with th.no_grad():
-            mean, log_std, kwargs = policy.actor.get_action_dist_params(next_obs)
+            mean, log_std, kwargs = policy.actor.get_action_dist_params(next_obs_policy)
             actions = policy.actor.action_dist.actions_from_params(
                 mean, log_std, deterministic=True, **kwargs
             )
-        return actions
+        return actions.to(self.device)
 
     def fit(
         self,
@@ -178,11 +189,12 @@ class FQETrainer:
             epoch_loss = 0.0
             n_batches = 0
             for batch in loader:
+                # DataLoader returns tensors on CPU, move to device
                 if use_cached_eval:
-                    obs_b, act_b, rew_b, next_obs_b, done_b, eval_act_next_b = batch
+                    obs_b, act_b, rew_b, next_obs_b, done_b, eval_act_next_b = [t.to(self.device) for t in batch]
                     a_next = eval_act_next_b
                 else:
-                    obs_b, act_b, rew_b, next_obs_b, done_b = batch
+                    obs_b, act_b, rew_b, next_obs_b, done_b = [t.to(self.device) for t in batch]
                     a_next = self._predict_eval_action(next_obs_b)
 
                 with th.no_grad():
@@ -210,8 +222,8 @@ class FQETrainer:
         """Predict Q-value: Q(s, a).
 
         Args:
-            obs: Observation tensor (batch_size, obs_dim).
-            act: Action tensor (batch_size, act_dim).
+            obs: Observation tensor (batch_size, obs_dim), should be on self.device.
+            act: Action tensor (batch_size, act_dim), should be on self.device.
 
         Returns:
             Q-values (batch_size,).
