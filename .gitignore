@@ -17,3 +17,7 @@ plots/
 .coverage
 f16trace.csv
 dev_logs/exp_logs.md
+
+.vscode/
+.cursor/
+trash/
