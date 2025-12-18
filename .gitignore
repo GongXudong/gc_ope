@@ -21,3 +21,5 @@ dev_logs/exp_logs.md
 .vscode/
 .cursor/
 trash/
+*.pkl
+*.log

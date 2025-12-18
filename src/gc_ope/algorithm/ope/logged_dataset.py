@@ -11,6 +11,7 @@ from typing import Any, Dict, Iterable, Optional, Tuple
 
 import numpy as np
 import torch as th
+from tqdm import tqdm
 from stable_baselines3.common.base_class import BaseAlgorithm
 
 
@@ -33,7 +34,13 @@ def flatten_obs(obs: Dict[str, Any]) -> np.ndarray:
 
 # Import compute_action_log_prob from algorithm_adapter
 # This function supports multiple algorithms (SAC, PPO, HER, etc.)
-from .algorithm_adapter import compute_action_log_prob as _compute_action_log_prob
+from .algorithm_adapter import (
+    compute_action_log_prob as _compute_action_log_prob,
+    compute_action_log_prob_batch,
+    predict_eval_action,
+    predict_eval_action_batch_dict,
+    compute_action_log_prob_batch_dict,
+)
 
 
 @dataclass
@@ -160,7 +167,7 @@ def collect_logged_dataset(
 
 
 def compute_eval_policy_cache(
-    dataset: LoggedDataset, eval_algo: BaseAlgorithm
+    dataset: LoggedDataset, eval_algo: BaseAlgorithm, batch_size: int = 256
 ) -> LoggedDataset:
     """Compute and cache evaluation policy actions and log-probabilities.
 
@@ -172,6 +179,7 @@ def compute_eval_policy_cache(
     Args:
         dataset: Logged dataset from behavior policy (must have obs_dict and next_obs_dict).
         eval_algo: Evaluation policy (e.g., later checkpoint of SAC).
+        batch_size: Batch size for batch processing (default: 256).
 
     Returns:
         The same dataset with eval_action_curr, eval_action_next, eval_log_prob_curr,
@@ -181,30 +189,96 @@ def compute_eval_policy_cache(
     Note:
         This function modifies the dataset in-place and also returns it for convenience.
     """
-    eval_action_curr: list[np.ndarray] = []
-    eval_action_next: list[np.ndarray] = []
-    eval_log_prob_curr: list[float] = []
-    eval_log_prob_next: list[float] = []
-
-    for obs, next_obs in zip(dataset.obs_dict, dataset.next_obs_dict):
-        # Compute eval policy actions at s_t and s_{t+1}
-        a_curr, _ = eval_algo.predict(obs, deterministic=True)
-        a_next, _ = eval_algo.predict(next_obs, deterministic=True)
-        
-        # Compute log-probabilities (supports multiple algorithms)
-        a_curr_t, eval_logp_curr = _compute_action_log_prob(eval_algo, obs, a_curr)
-        a_next_t, eval_logp_next = _compute_action_log_prob(eval_algo, next_obs, a_next)
-        
-        eval_action_curr.append(a_curr_t)
-        eval_action_next.append(a_next_t)
-        eval_log_prob_curr.append(eval_logp_curr)
-        eval_log_prob_next.append(eval_logp_next)
+    policy = eval_algo.policy
+    device = policy.device
+    
+    # Convert dictionary observations to batch dictionary tensors for policy
+    def obs_dict_list_to_batch_dict(obs_dict_list: list[Dict[str, Any]]) -> Dict[str, th.Tensor]:
+        """Convert a list of observation dictionaries to a batch dictionary tensor."""
+        # Stack each key's values into a batch tensor
+        batch_dict = {}
+        for key in obs_dict_list[0].keys():
+            values = [obs_dict[key] for obs_dict in obs_dict_list]
+            # Stack numpy arrays and convert to tensor
+            stacked = np.stack(values, axis=0)
+            batch_dict[key] = th.as_tensor(stacked, device=device, dtype=th.float32)
+        return batch_dict
+    
+    print("Computing eval policy cache (batch processing)")
+    n_samples = len(dataset.obs_dict)
+    eval_action_curr_list: list[np.ndarray] = []
+    eval_action_next_list: list[np.ndarray] = []
+    eval_log_prob_curr_list: list[float] = []
+    eval_log_prob_next_list: list[float] = []
+    
+    with tqdm(total=n_samples, desc="Computing eval policy cache") as pbar:
+        for i in range(0, n_samples, batch_size):
+            end_idx = min(i + batch_size, n_samples)
+            batch_obs_dict = dataset.obs_dict[i:end_idx]
+            batch_next_obs_dict = dataset.next_obs_dict[i:end_idx]
+            
+            # Convert to batch dictionary tensors
+            obs_batch_dict = obs_dict_list_to_batch_dict(batch_obs_dict)
+            next_obs_batch_dict = obs_dict_list_to_batch_dict(batch_next_obs_dict)
+            
+            # Use policy's preprocessing to convert batch dict to tensor
+            # The policy's preprocess_obs should handle batch dict correctly
+            from stable_baselines3.common.preprocessing import preprocess_obs
+            obs_tensor = preprocess_obs(
+                obs_batch_dict, 
+                policy.observation_space, 
+                normalize_images=policy.normalize_images
+            )
+            next_obs_tensor = preprocess_obs(
+                next_obs_batch_dict,
+                policy.observation_space,
+                normalize_images=policy.normalize_images
+            )
+            
+            # Move to device if not already
+            if isinstance(obs_tensor, dict):
+                obs_tensor = {k: v.to(device) for k, v in obs_tensor.items()}
+                next_obs_tensor = {k: v.to(device) for k, v in next_obs_tensor.items()}
+            else:
+                obs_tensor = obs_tensor.to(device)
+                next_obs_tensor = next_obs_tensor.to(device)
+            
+            # Use batch dictionary processing functions
+            a_curr_tensor = predict_eval_action_batch_dict(
+                eval_algo, obs_batch_dict, deterministic=True
+            )
+            a_next_tensor = predict_eval_action_batch_dict(
+                eval_algo, next_obs_batch_dict, deterministic=True
+            )
+            
+            # Compute log-probabilities (batch)
+            eval_logp_curr_tensor = compute_action_log_prob_batch_dict(
+                eval_algo, obs_batch_dict, a_curr_tensor
+            )
+            eval_logp_next_tensor = compute_action_log_prob_batch_dict(
+                eval_algo, next_obs_batch_dict, a_next_tensor
+            )
+            
+            # Convert to numpy and store
+            a_curr_np = a_curr_tensor.cpu().numpy().astype(np.float32)
+            a_next_np = a_next_tensor.cpu().numpy().astype(np.float32)
+            eval_logp_curr_np = eval_logp_curr_tensor.cpu().numpy().astype(np.float32)
+            eval_logp_next_np = eval_logp_next_tensor.cpu().numpy().astype(np.float32)
+            
+            # Append to lists
+            for j in range(end_idx - i):
+                eval_action_curr_list.append(a_curr_np[j])
+                eval_action_next_list.append(a_next_np[j])
+                eval_log_prob_curr_list.append(eval_logp_curr_np[j])
+                eval_log_prob_next_list.append(eval_logp_next_np[j])
+            
+            pbar.update(end_idx - i)
 
     # Cache the computed values
-    dataset.eval_action_curr = np.asarray(eval_action_curr, dtype=np.float32)
-    dataset.eval_action_next = np.asarray(eval_action_next, dtype=np.float32)
-    dataset.eval_log_prob_curr = np.asarray(eval_log_prob_curr, dtype=np.float32)
-    dataset.eval_log_prob_next = np.asarray(eval_log_prob_next, dtype=np.float32)
+    dataset.eval_action_curr = np.asarray(eval_action_curr_list, dtype=np.float32)
+    dataset.eval_action_next = np.asarray(eval_action_next_list, dtype=np.float32)
+    dataset.eval_log_prob_curr = np.asarray(eval_log_prob_curr_list, dtype=np.float32)
+    dataset.eval_log_prob_next = np.asarray(eval_log_prob_next_list, dtype=np.float32)
 
     return dataset
 

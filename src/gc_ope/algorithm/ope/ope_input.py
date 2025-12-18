@@ -7,6 +7,7 @@ from typing import Any, Dict, Optional, Sequence
 
 import numpy as np
 import torch as th
+import pickle
 from stable_baselines3.common.base_class import BaseAlgorithm
 
 from .fqe import FQETrainer
@@ -68,6 +69,9 @@ def _ensure_eval_actions(
 
     # Use compute_eval_policy_cache to compute and cache eval policy actions/log-probs
     compute_eval_policy_cache(dataset, eval_algo)
+    with open('dataset.pkl', 'wb') as f:
+        pickle.dump(dataset, f)
+    print("Eval policy actions/log-probs are computed & saved to dataset.pkl")
     return dataset.eval_action_curr, dataset.eval_log_prob_curr
 
 
@@ -108,7 +112,9 @@ def build_ope_inputs(
         to the user. This simplifies the API and ensures consistent usage.
     """
     # Ensure eval policy actions/log-probs are available
+    print("Ensure eval policy actions/log-probs are available")
     eval_actions, eval_log_prob = _ensure_eval_actions(dataset, eval_algo)
+    print("Eval policy actions/log-probs are available")
 
     # Handle Q-function computation
     if q_function_method == "fqe":
@@ -122,7 +128,7 @@ def build_ope_inputs(
                 "tau": 0.005,
                 "lr": 3e-4,
                 "hidden_sizes": (256, 256),
-                "obs_state_dim": None,
+                "obs_state_dim": None, # 默认使用simple mode，将observation和action拼接作为输入
                 "goal_dim": None,
                 "device": None,
             }
@@ -139,7 +145,7 @@ def build_ope_inputs(
 
             # Default training arguments
             default_train_kwargs: Dict[str, Any] = {
-                "batch_size": 256,
+                "batch_size": 1024,
                 "n_epochs": 500,
                 "shuffle": True,
                 "logger": None,

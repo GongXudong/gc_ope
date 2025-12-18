@@ -45,6 +45,8 @@ class FQEQNetwork(nn.Module):
 
         if self.use_goal_conditioned:
             # Goal-conditioned mode: separate processing for state and goal
+            print("Goal-conditioned mode: separate processing for state and goal")
+            print(f"obs_state_dim: {obs_state_dim}, goal_dim: {goal_dim}, obs_dim: {obs_dim}")
             if obs_state_dim + 2 * goal_dim != obs_dim:
                 raise ValueError(
                     f"obs_state_dim ({obs_state_dim}) + 2 * goal_dim ({2 * goal_dim}) "
@@ -84,6 +86,7 @@ class FQEQNetwork(nn.Module):
             self.fusion_net = nn.Sequential(*fusion_layers)
         else:
             # Simple mode: concatenate obs and action, then MLP
+            print("Simple mode: concatenate obs and action, then MLP")
             layers: list[nn.Module] = []
             in_dim = obs_dim + act_dim
             for h in hidden_sizes:
@@ -134,11 +137,11 @@ class FQETrainer:
 
     .. math::
 
-        L(\theta) = \mathbb{E}_{(s_t, a_t, r_{t+1}, s_{t+1}) \sim D}
-            \left[ \left( Q_\theta(s_t, a_t) - r_{t+1}
-                - \gamma Q_{\theta'}(s_{t+1}, \pi_\phi(s_{t+1})) \right)^2 \right]
+        L(\\theta) = \\mathbb{E}_{(s_t, a_t, r_{t+1}, s_{t+1}) \\sim D}
+                \\left[ \\left( Q_\\theta(s_t, a_t) - r_{t+1}
+                - \\gamma Q_{\\theta'}(s_{t+1}, \\pi_\\phi(s_{t+1})) \\right)^2 \\right]
 
-    Plain text formula: L(θ) = E[(Q_θ(s_t, a_t) - r_{t+1} - γ Q_θ'(s_{t+1}, π_φ(s_{t+1})))^2]
+        Plain text formula: L(θ) = E[(Q_θ(s_t, a_t) - r_{t+1} - γ Q_θ'(s_{t+1}, π_φ(s_{t+1})))^2]
     where the expectation is over transitions (s_t, a_t, r_{t+1}, s_{t+1}) from dataset D.
 
     where :math:`D` is the logged dataset, :math:`\theta'` is the target network
@@ -200,7 +203,20 @@ class FQETrainer:
             obs_dim, act_dim, hidden_sizes, obs_state_dim=obs_state_dim, goal_dim=goal_dim
         ).to(self.device)
         self.q_target.load_state_dict(self.q.state_dict())
+        
+        # Initialize weights with better initialization
+        self._initialize_weights(self.q)
+        self._initialize_weights(self.q_target)
+        
         self.optim = th.optim.Adam(self.q.parameters(), lr=lr)
+    
+    def _initialize_weights(self, network: nn.Module) -> None:
+        """Initialize network weights with Xavier uniform initialization."""
+        for m in network.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight, gain=1.0)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0.0)
 
     def _predict_eval_action(self, next_obs: th.Tensor) -> th.Tensor:
         """Compute deterministic evaluation policy action.
@@ -227,6 +243,13 @@ class FQETrainer:
         n_epochs: int = 500,
         shuffle: bool = True,
         logger: Optional[callable] = None,
+            gradient_clip: float = 1.0,
+            target_update_freq: int = 1,
+            num_workers: int = 0,
+            pin_memory: bool = True,
+            lr_schedule: Optional[str] = None,
+            lr_decay_factor: float = 0.1,
+            lr_decay_epochs: Optional[Sequence[int]] = None,
     ) -> None:
         """Train FQE Q-network on logged dataset.
 
@@ -234,8 +257,8 @@ class FQETrainer:
 
         .. math::
 
-            L(\theta) = \mathbb{E}_{(s_t, a_t, r_{t+1}, s_{t+1}) \sim D}
-                \left[ \left( Q_\theta(s_t, a_t) - y_t \right)^2 \right]
+            L(\\theta) = \\mathbb{E}_{(s_t, a_t, r_{t+1}, s_{t+1}) \\sim D}
+                \\left[ \\left( Q_\\theta(s_t, a_t) - y_t \\right)^2 \\right]
 
         Plain text: L(θ) = E[(Q_θ(s_t, a_t) - y_t)^2]
 
@@ -243,7 +266,7 @@ class FQETrainer:
 
         .. math::
 
-            y_t = r_{t+1} + \gamma (1 - \text{done}_t) Q_{\theta'}(s_{t+1}, \pi_\phi(s_{t+1}))
+            y_t = r_{t+1} + \\gamma (1 - \\text{done}_t) Q_{\\theta'}(s_{t+1}, \\pi_\\phi(s_{t+1}))
 
         Plain text: y_t = r_{t+1} + γ (1 - done_t) Q_θ'(s_{t+1}, π_φ(s_{t+1}))
 
@@ -253,32 +276,61 @@ class FQETrainer:
             n_epochs: Number of training epochs (default: 500).
             shuffle: Whether to shuffle data each epoch (default: True).
             logger: Optional callback(epoch, loss) for logging (default: None).
+            gradient_clip: Gradient clipping value (default: 1.0). Set to 0 to disable.
+            target_update_freq: Update target network every N batches (default: 1, i.e., every batch).
+            num_workers: Number of DataLoader workers (default: 0). Increase for faster data loading.
+            pin_memory: Whether to pin memory in DataLoader (default: True, faster GPU transfer).
+            lr_schedule: Learning rate schedule type: "step" or None (default: None).
+            lr_decay_factor: Learning rate decay factor for step schedule (default: 0.1).
+            lr_decay_epochs: Epochs at which to decay learning rate for step schedule (default: None).
         """
-        obs = th.as_tensor(dataset.obs_flat, device=self.device)
-        act = th.as_tensor(dataset.actions, device=self.device)
-        rew = th.as_tensor(dataset.rewards, device=self.device).float()
-        next_obs = th.as_tensor(dataset.next_obs_flat, device=self.device)
-        done = th.as_tensor(dataset.dones, device=self.device).float()
+        # Keep data on CPU for DataLoader, move to device in training loop
+        # This allows pin_memory to work correctly
+        obs = th.as_tensor(dataset.obs_flat, device='cpu')
+        act = th.as_tensor(dataset.actions, device='cpu')
+        rew = th.as_tensor(dataset.rewards, device='cpu').float()
+        next_obs = th.as_tensor(dataset.next_obs_flat, device='cpu')
+        done = th.as_tensor(dataset.dones, device='cpu').float()
 
         if dataset.eval_action_next is not None:
-            eval_act_next_tensor = th.as_tensor(dataset.eval_action_next, device=self.device)
+            eval_act_next_tensor = th.as_tensor(dataset.eval_action_next, device='cpu')
             data = TensorDataset(obs, act, rew, next_obs, done, eval_act_next_tensor)
             use_cached_eval = True
         else:
             data = TensorDataset(obs, act, rew, next_obs, done)
             use_cached_eval = False
-        loader = DataLoader(data, batch_size=batch_size, shuffle=shuffle)
+        
+        # Optimize DataLoader for faster training
+        # Note: CUDA doesn't support multiprocessing in DataLoader, so set num_workers=0 for CUDA
+        effective_num_workers = 0 if self.device.type == 'cuda' else num_workers
+        loader = DataLoader(
+            data, 
+            batch_size=batch_size, 
+            shuffle=shuffle,
+            num_workers=effective_num_workers,
+            pin_memory=pin_memory and self.device.type == 'cuda',
+            persistent_workers=effective_num_workers > 0,
+        )
 
+        # Setup learning rate scheduler
+        if lr_schedule == "step" and lr_decay_epochs is not None:
+            scheduler = th.optim.lr_scheduler.MultiStepLR(
+                self.optim, milestones=lr_decay_epochs, gamma=lr_decay_factor
+            )
+        else:
+            scheduler = None
+
+        batch_count = 0
         for epoch in range(1, n_epochs + 1):
             epoch_loss = 0.0
             n_batches = 0
             for batch in loader:
                 # DataLoader returns tensors on CPU, move to device
                 if use_cached_eval:
-                    obs_b, act_b, rew_b, next_obs_b, done_b, eval_act_next_b = [t.to(self.device) for t in batch]
+                    obs_b, act_b, rew_b, next_obs_b, done_b, eval_act_next_b = [t.to(self.device, non_blocking=pin_memory) for t in batch]
                     a_next = eval_act_next_b
                 else:
-                    obs_b, act_b, rew_b, next_obs_b, done_b = [t.to(self.device) for t in batch]
+                    obs_b, act_b, rew_b, next_obs_b, done_b = [t.to(self.device, non_blocking=pin_memory) for t in batch]
                     a_next = self._predict_eval_action(next_obs_b)
 
                 with th.no_grad():
@@ -290,14 +342,26 @@ class FQETrainer:
 
                 self.optim.zero_grad()
                 loss.backward()
+                
+                # Gradient clipping to prevent exploding gradients
+                if gradient_clip > 0:
+                    th.nn.utils.clip_grad_norm_(self.q.parameters(), gradient_clip)
+                
                 self.optim.step()
 
-                with th.no_grad():
-                    for p, p_targ in zip(self.q.parameters(), self.q_target.parameters()):
-                        p_targ.data.mul_(1.0 - self.tau).add_(self.tau * p.data)
+                # Update target network less frequently for stability
+                batch_count += 1
+                if batch_count % target_update_freq == 0:
+                    with th.no_grad():
+                        for p, p_targ in zip(self.q.parameters(), self.q_target.parameters()):
+                            p_targ.data.mul_(1.0 - self.tau).add_(self.tau * p.data)
 
                 epoch_loss += loss.item()
                 n_batches += 1
+
+            # Update learning rate scheduler
+            if scheduler is not None:
+                scheduler.step()
 
             if logger is not None:
                 logger(epoch=epoch, loss=epoch_loss / max(n_batches, 1))

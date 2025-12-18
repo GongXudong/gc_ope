@@ -1,7 +1,7 @@
 defaults:
-  - algo: ppo_for_flycraft
-  - env: flycraft_for_ppo  # my_reach_for_sac
-  - callback: ppo
+  - algo: sac_for_flycraft
+  - env: flycraft_for_sac  # my_reach_for_sac
+  - callback: sac
   - evaluate: flycraft
   - _self_
 
