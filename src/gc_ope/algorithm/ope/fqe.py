@@ -10,43 +10,118 @@ from stable_baselines3.common.base_class import BaseAlgorithm
 from torch.utils.data import DataLoader, TensorDataset
 
 from .logged_dataset import LoggedDataset
+from .algorithm_adapter import predict_eval_action
 
 
-class FQEQNetwork(nn.Module): #TODO: goal-conditioned的Q网络；可能网络要做优化
-    """Q-network for Fitted Q Evaluation.
+class FQEQNetwork(nn.Module):
+    """Q-network for Fitted Q Evaluation with optional goal-conditioned optimization.
 
-    A simple MLP that takes concatenated observation and action as input
-    and outputs a scalar Q-value: :math:`Q_\theta(s, a)`.
+    Supports two modes:
+    1. Simple mode (default): Concatenates observation and action, then passes through MLP.
+    2. Goal-conditioned mode: Separately processes observation state and goal, then fuses them.
 
     Args:
-        obs_dim: Dimension of flattened observation.
+        obs_dim: Dimension of flattened observation (includes state + goals if flattened).
         act_dim: Dimension of action space.
         hidden_sizes: Hidden layer sizes (default: (256, 256)).
+        obs_state_dim: Optional dimension of observation state (without goals).
+            If provided, enables goal-conditioned mode.
+        goal_dim: Optional dimension of goal (desired_goal and achieved_goal, typically same).
+            Required if obs_state_dim is provided.
     """
 
-    def __init__(self, obs_dim: int, act_dim: int, hidden_sizes: Sequence[int] = (256, 256)) -> None:
+    def __init__(
+        self,
+        obs_dim: int,
+        act_dim: int,
+        hidden_sizes: Sequence[int] = (256, 256),
+        obs_state_dim: Optional[int] = None,
+        goal_dim: Optional[int] = None,
+    ) -> None:
         super().__init__()
-        layers: list[nn.Module] = []
-        in_dim = obs_dim + act_dim
-        for h in hidden_sizes:
-            layers.append(nn.Linear(in_dim, h))
-            layers.append(nn.ReLU())
-            in_dim = h
-        layers.append(nn.Linear(in_dim, 1))
-        self.net = nn.Sequential(*layers)
+        self.obs_dim = obs_dim
+        self.act_dim = act_dim
+        self.use_goal_conditioned = obs_state_dim is not None and goal_dim is not None
+
+        if self.use_goal_conditioned:
+            # Goal-conditioned mode: separate processing for state and goal
+            if obs_state_dim + 2 * goal_dim != obs_dim:
+                raise ValueError(
+                    f"obs_state_dim ({obs_state_dim}) + 2 * goal_dim ({2 * goal_dim}) "
+                    f"must equal obs_dim ({obs_dim})"
+                )
+
+            # Store dimensions for forward pass
+            self._obs_state_dim = obs_state_dim
+            self._goal_dim = goal_dim
+
+            # State encoder
+            state_layers: list[nn.Module] = []
+            in_dim = obs_state_dim
+            for h in hidden_sizes:
+                state_layers.append(nn.Linear(in_dim, h))
+                state_layers.append(nn.ReLU())
+                in_dim = h
+            self.state_encoder = nn.Sequential(*state_layers)
+
+            # Goal encoder (processes desired_goal and achieved_goal together)
+            goal_layers: list[nn.Module] = []
+            in_dim = 2 * goal_dim  # desired_goal + achieved_goal
+            for h in hidden_sizes:
+                goal_layers.append(nn.Linear(in_dim, h))
+                goal_layers.append(nn.ReLU())
+                in_dim = h
+            self.goal_encoder = nn.Sequential(*goal_layers)
+
+            # Fusion layer: combines state and goal features, then adds action
+            fusion_layers: list[nn.Module] = []
+            in_dim = hidden_sizes[-1] * 2 + act_dim  # state_feat + goal_feat + action
+            for h in hidden_sizes:
+                fusion_layers.append(nn.Linear(in_dim, h))
+                fusion_layers.append(nn.ReLU())
+                in_dim = h
+            fusion_layers.append(nn.Linear(in_dim, 1))
+            self.fusion_net = nn.Sequential(*fusion_layers)
+        else:
+            # Simple mode: concatenate obs and action, then MLP
+            layers: list[nn.Module] = []
+            in_dim = obs_dim + act_dim
+            for h in hidden_sizes:
+                layers.append(nn.Linear(in_dim, h))
+                layers.append(nn.ReLU())
+                in_dim = h
+            layers.append(nn.Linear(in_dim, 1))
+            self.net = nn.Sequential(*layers)
 
     def forward(self, obs: th.Tensor, act: th.Tensor) -> th.Tensor:
         """Forward pass: Q(s, a).
 
         Args:
             obs: Observation tensor (batch_size, obs_dim).
+                In goal-conditioned mode, obs_dim = obs_state_dim + 2 * goal_dim,
+                where the format is [state, desired_goal, achieved_goal].
             act: Action tensor (batch_size, act_dim).
 
         Returns:
             Q-values (batch_size,).
         """
-        x = th.cat([obs, act], dim=-1)
-        return self.net(x).squeeze(-1)
+        if self.use_goal_conditioned:
+            # Split observation into state and goals
+            # obs format: [state, desired_goal, achieved_goal]
+            obs_state = obs[:, :self._obs_state_dim]
+            goal_part = obs[:, self._obs_state_dim:]
+            goal_desired = goal_part[:, :self._goal_dim]
+            goal_achieved = goal_part[:, self._goal_dim:]
+            goal_combined = th.cat([goal_desired, goal_achieved], dim=-1)
+
+            state_feat = self.state_encoder(obs_state)
+            goal_feat = self.goal_encoder(goal_combined)
+            fused = th.cat([state_feat, goal_feat, act], dim=-1)
+            return self.fusion_net(fused).squeeze(-1)
+        else:
+            # Simple mode
+            x = th.cat([obs, act], dim=-1)
+            return self.net(x).squeeze(-1)
 
 
 class FQETrainer:
@@ -85,6 +160,10 @@ class FQETrainer:
         tau: Soft update coefficient for target network (default: 0.005).
         lr: Learning rate for Q-network optimizer (default: 3e-4).
         hidden_sizes: Hidden layer sizes for Q-network (default: (256, 256)).
+        obs_state_dim: Optional dimension of observation state (without goals).
+            If provided with goal_dim, enables goal-conditioned network optimization.
+        goal_dim: Optional dimension of goal (desired_goal and achieved_goal, typically same).
+            Required if obs_state_dim is provided.
         device: PyTorch device (default: uses eval_algo.device).
     """
 
@@ -97,6 +176,8 @@ class FQETrainer:
         tau: float = 0.005,
         lr: float = 3e-4,
         hidden_sizes: Sequence[int] = (256, 256),
+        obs_state_dim: Optional[int] = None,
+        goal_dim: Optional[int] = None,
         device: Optional[str] = None,
     ) -> None:
         # Determine device: use provided device, or eval_algo.device, or default to cuda if available
@@ -112,13 +193,19 @@ class FQETrainer:
         self.eval_algo = eval_algo
         self.gamma = gamma
         self.tau = tau
-        self.q = FQEQNetwork(obs_dim, act_dim, hidden_sizes).to(self.device)
-        self.q_target = FQEQNetwork(obs_dim, act_dim, hidden_sizes).to(self.device)
+        self.q = FQEQNetwork(
+            obs_dim, act_dim, hidden_sizes, obs_state_dim=obs_state_dim, goal_dim=goal_dim
+        ).to(self.device)
+        self.q_target = FQEQNetwork(
+            obs_dim, act_dim, hidden_sizes, obs_state_dim=obs_state_dim, goal_dim=goal_dim
+        ).to(self.device)
         self.q_target.load_state_dict(self.q.state_dict())
         self.optim = th.optim.Adam(self.q.parameters(), lr=lr)
 
     def _predict_eval_action(self, next_obs: th.Tensor) -> th.Tensor:
         """Compute deterministic evaluation policy action.
+
+        Supports multiple algorithms (SAC, PPO, HER, etc.) via algorithm adapter.
 
         Args:
             next_obs: Next state tensor (batch_size, obs_dim), should be on self.device.
@@ -129,11 +216,8 @@ class FQETrainer:
         policy = self.eval_algo.policy
         # Convert to policy device for computation, then back to self.device
         next_obs_policy = next_obs.to(policy.device)
-        with th.no_grad():
-            mean, log_std, kwargs = policy.actor.get_action_dist_params(next_obs_policy)
-            actions = policy.actor.action_dist.actions_from_params(
-                mean, log_std, deterministic=True, **kwargs
-            )
+        # Use algorithm adapter to support multiple algorithm types
+        actions = predict_eval_action(self.eval_algo, next_obs_policy, deterministic=True)
         return actions.to(self.device)
 
     def fit(

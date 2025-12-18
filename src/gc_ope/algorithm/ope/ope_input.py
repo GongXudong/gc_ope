@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Dict, Optional, Sequence
 
 import numpy as np
 import torch as th
 from stable_baselines3.common.base_class import BaseAlgorithm
 
 from .fqe import FQETrainer
-from .logged_dataset import LoggedDataset, _compute_action_log_prob
+from .logged_dataset import LoggedDataset, _compute_action_log_prob, compute_eval_policy_cache
 
 
 @dataclass
@@ -54,7 +54,7 @@ def _ensure_eval_actions(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Ensure evaluation policy actions and log-probs are available.
 
-    Returns cached values if present, otherwise computes them on-the-fly.
+    Returns cached values if present, otherwise computes them using compute_eval_policy_cache.
 
     Args:
         dataset: Logged dataset (may or may not have eval_action_curr cached).
@@ -66,35 +66,93 @@ def _ensure_eval_actions(
     if dataset.eval_action_curr is not None and dataset.eval_log_prob_curr is not None:
         return dataset.eval_action_curr, dataset.eval_log_prob_curr
 
-    eval_actions: list[np.ndarray] = []
-    eval_log_probs: list[float] = []
-    for obs in dataset.obs_dict:
-        action, _ = eval_algo.predict(obs, deterministic=True)
-        _, logp = _compute_action_log_prob(eval_algo, obs, action)
-        eval_actions.append(action.astype(np.float32))
-        eval_log_probs.append(logp)
-    return np.asarray(eval_actions, dtype=np.float32), np.asarray(eval_log_probs, dtype=np.float32)
+    # Use compute_eval_policy_cache to compute and cache eval policy actions/log-probs
+    compute_eval_policy_cache(dataset, eval_algo)
+    return dataset.eval_action_curr, dataset.eval_log_prob_curr
 
 
 def build_ope_inputs(
-    dataset: LoggedDataset, eval_algo: BaseAlgorithm, fqe: FQETrainer, gamma: float
+    dataset: LoggedDataset,
+    eval_algo: BaseAlgorithm,
+    gamma: float,
+    fqe: Optional[FQETrainer] = None,
+    q_function_method: str = "fqe",
+    fqe_train_kwargs: Optional[Dict[str, Any]] = None,
+    fqe_kwargs: Optional[Dict[str, Any]] = None,
 ) -> OPEInputs:
     """Build OPE inputs from logged dataset and trained FQE model.
 
     Computes evaluation policy actions/log-probs and Q-values needed for
-    DM, TIS, and DR estimators.
+    DM, TIS, and DR estimators. If `fqe` is not provided, automatically creates
+    and trains an FQE model (if `q_function_method="fqe"`).
 
     Args:
         dataset: Logged dataset from behavior policy.
         eval_algo: Evaluation policy.
-        fqe: Trained FQE model.
         gamma: Discount factor.
+        fqe: Optional pre-trained FQE model. If None and `q_function_method="fqe"`,
+            a new FQE model will be created and trained.
+        q_function_method: Method for computing Q-values. Currently only "fqe" is supported.
+            Default: "fqe".
+        fqe_train_kwargs: Optional dictionary of arguments for FQE training (fit method).
+            Keys: batch_size, n_epochs, shuffle, logger. Default: batch_size=256, n_epochs=500.
+        fqe_kwargs: Optional dictionary of arguments for FQETrainer initialization.
+            Keys: tau, lr, hidden_sizes, obs_state_dim, goal_dim, device.
+            Default: tau=0.005, lr=3e-4, hidden_sizes=(256, 256).
 
     Returns:
         OPEInputs containing all data needed for OPE estimators.
+
+    Note:
+        The FQE training process is now integrated into this function and not exposed
+        to the user. This simplifies the API and ensures consistent usage.
     """
+    # Ensure eval policy actions/log-probs are available
     eval_actions, eval_log_prob = _ensure_eval_actions(dataset, eval_algo)
 
+    # Handle Q-function computation
+    if q_function_method == "fqe":
+        # Create and train FQE if not provided
+        if fqe is None:
+            obs_dim = dataset.obs_flat.shape[1]
+            act_dim = dataset.actions.shape[1]
+
+            # Default FQE initialization arguments
+            default_fqe_kwargs: Dict[str, Any] = {
+                "tau": 0.005,
+                "lr": 3e-4,
+                "hidden_sizes": (256, 256),
+                "obs_state_dim": None,
+                "goal_dim": None,
+                "device": None,
+            }
+            if fqe_kwargs is not None:
+                default_fqe_kwargs.update(fqe_kwargs)
+
+            fqe = FQETrainer(
+                obs_dim=obs_dim,
+                act_dim=act_dim,
+                eval_algo=eval_algo,
+                gamma=gamma,
+                **default_fqe_kwargs,
+            )
+
+            # Default training arguments
+            default_train_kwargs: Dict[str, Any] = {
+                "batch_size": 256,
+                "n_epochs": 500,
+                "shuffle": True,
+                "logger": None,
+            }
+            if fqe_train_kwargs is not None:
+                default_train_kwargs.update(fqe_train_kwargs)
+
+            # Train FQE
+            fqe.fit(dataset, **default_train_kwargs)
+    else:
+        raise ValueError(f"Unsupported q_function_method: {q_function_method}")
+
+    # Compute Q-values using trained FQE
     device = fqe.device
     # Convert numpy arrays to tensors and move to device
     obs_t = th.as_tensor(dataset.obs_flat, device=device, dtype=th.float32)
