@@ -61,12 +61,8 @@ OPE 的目标是在不实际运行策略的情况下，利用**行为策略 (Beh
     *   FQE 训练包含梯度裁剪、Soft-Update 和灵活的 Logger。
     *   提供了 `compute_eval_policy_cache` 批量计算推理，大幅提升了离线评估的速度。
 
-### 4. 改进建议（根据注释信息）
-*   **Goal-Conditioned 细化**：目前 `build_ope_inputs` 默认可能还是使用 Simple Mode（拼接 obs）。如果要完全发挥 GC 特性，应在调用时显式传入 `obs_state_dim` 和 `goal_dim` 以启用双编码器结构。
-*   **日志存档**：代码中提到了一些 TODO，建议将训练过程中的 `loss_log` 和最终的 `EstimateResult` 自动保存为 JSON 或 Tensorboard 文件。
-
 ## record
-I have successfully addressed the FQE loss explosion and the divergence of OPE estimates.
+Addressed the FQE loss explosion and the divergence of OPE estimates.
 
 **Summary of Fixes:**
 
