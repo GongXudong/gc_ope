@@ -100,7 +100,7 @@ inputs = build_ope_inputs(
     # q_function_method="fqe",  # 默认 "fqe"
     fqe_train_kwargs={
         "batch_size": 512,  # 增大batch size加速训练
-        "n_epochs": 30,
+        "n_epochs": 100,
         "shuffle": True,
         "logger": _logger,
         "gradient_clip": 1.0,  # 梯度裁剪防止梯度爆炸
@@ -163,7 +163,7 @@ dr_res = dr_estimate(inputs, ci_method="bootstrap")
 
 print("DM (step-wise):", dm_all)
 # print("DM (initial-state):", dm_init)
-print("TIS:", tis_res) #TODO: 需要实现TIS的计算
+print("TIS:", tis_res) #TODO: 解决TIS计算报错的问题
 print("DR:", dr_res)
 '''
 /home/maxine/ai4robot/gc_ope/src/gc_ope/algorithm/ope/estimators.py:184: RuntimeWarning: overflow encountered in exp
