@@ -181,7 +181,23 @@ def tis_compute_trajectory_values(inputs: OPEInputs) -> np.ndarray:
         r = inputs.rewards[idxs]
         logp_b = inputs.behavior_log_prob[idxs]
         logp_e = inputs.eval_log_prob[idxs]
-        weight = np.exp((logp_e - logp_b).sum())
+        
+        # Clip log-importance weights to prevent overflow/underflow
+        # max_log_weight = 10.0 (approx exp(10) ~ 22000)
+        log_weights = np.clip(logp_e - logp_b, -10.0, 10.0)
+        
+        # Calculate trajectory weight
+        # Still can overflow if trajectory is long, but less likely
+        weight = np.exp(log_weights.sum())
+        
+        # Additional safety check for infinity
+        if not np.isfinite(weight):
+            weight = 0.0  # or some large constant, but 0 is safer for stability
+        
+        # Hard clip the cumulative weight for TIS to prevent overflow
+        # Values > 1e4 usually imply numerical instability or zero support
+        weight = np.clip(weight, 0.0, 1e4)
+            
         discounts = np.power(gamma, np.arange(len(r)))
         returns.append(weight * np.sum(discounts * r))
     return np.asarray(returns, dtype=np.float32)
@@ -250,8 +266,18 @@ def dr_compute_trajectory_values(inputs: OPEInputs) -> np.ndarray:
         q_sa = inputs.q_sa_behavior[idxs]
         v_eval = inputs.q_sa_eval[idxs]
 
-        ratios = np.exp(logp_e - logp_b)
+        # Clip importance ratios per step
+        # Common practice in PPO (e.g., clip to [0.8, 1.2]) or more generous here for IS
+        # Let's clip to [0, 100] to prevent single-step explosion
+        ratios = np.exp(np.clip(logp_e - logp_b, -10.0, 5.0))  # exp(5) ~ 148
+        
+        # Cumulative product with safety checks
         w_step = np.cumprod(ratios)
+        
+        # If cumulative weight becomes too large, clip it
+        # This biases the estimator but reduces variance and prevents NaN/Inf
+        w_step = np.clip(w_step, 0.0, 1e4) 
+        
         w_prev = np.concatenate([[1.0], w_step[:-1]])
         discounts = np.power(gamma, np.arange(len(r)))
 
@@ -309,4 +335,3 @@ def dr_estimate(
     """
     trajectory_values = dr_compute_trajectory_values(inputs)
     return compute_estimate_with_ci(trajectory_values, ci_method=ci_method, **ci_kwargs)
-

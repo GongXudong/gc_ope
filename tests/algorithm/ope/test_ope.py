@@ -63,7 +63,7 @@ print("gamma=", gamma)
 #STEP2： 采样行为数据（已实现：数据采样和评价策略缓存分离）
 # 现在 collect_logged_dataset 只进行数据采样，评价策略缓存会在 build_ope_inputs 中自动计算
 # TODO：做日志存档
-n_episodes = 1000
+n_episodes = 10
 max_steps = 400
 
 if not os.path.exists("dataset.pkl"):

@@ -334,11 +334,23 @@ class FQETrainer:
                     a_next = self._predict_eval_action(next_obs_b)
 
                 with th.no_grad():
+                    # Double Q-learning style target: use q_target for evaluation
                     target_q = self.q_target(next_obs_b, a_next)
+                    
+                    # Optional: Clip target Q-values to prevent explosion
+                    # Assuming rewards are roughly in range, we can clip Q-values
+                    # For FlyCraft/standard envs, returns are often bounded.
+                    # A reasonable range might be [-1000, 1000] for many tasks, 
+                    # but let's be safe or just clip the loss.
+                    # For now, let's just stick to standard FQE.
+                    
                     y = rew_b + self.gamma * (1.0 - done_b) * target_q
 
                 q_pred = self.q(obs_b, act_b)
-                loss = th.mean((q_pred - y) ** 2)
+                
+                # Use Huber Loss (SmoothL1Loss) instead of MSE to be more robust to outliers
+                # This helps prevent loss explosion when Q-values are large
+                loss = th.nn.functional.smooth_l1_loss(q_pred, y)
 
                 self.optim.zero_grad()
                 loss.backward()
@@ -377,4 +389,3 @@ class FQETrainer:
             Q-values (batch_size,).
         """
         return self.q(obs, act)
-
