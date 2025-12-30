@@ -27,6 +27,7 @@ def extract_line_data(line):
 def process_file(
     file_path,
     sample_goal_log_begin_strs: list[str] = ["sample from omega random", "find min", "find max"],
+    goal_dim: int = 3,
 ):
     """
     处理整个文件，提取所有行的数据
@@ -52,7 +53,7 @@ def process_file(
 
                         point_data, score_value = extract_line_data(line)
 
-                        if len(point_data) == 3 and score_value is not None:
+                        if len(point_data) == goal_dim and score_value is not None:
                             all_timestamps.append(current_timestamps)
                             all_points.append(point_data)
                             all_scores.append(score_value)
