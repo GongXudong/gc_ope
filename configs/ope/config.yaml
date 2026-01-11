@@ -1,0 +1,15 @@
+env: my_reach
+env_id: MyReachSparse-v0
+algo: sac
+# Behavior policy data collection settings
+data_collection:
+  num_episodes: 10000  # Number of episodes to collect
+  max_steps: 400  # Max length of each episode
+  seed: 42  # Random seed for data collection
+  save_root: data  # Path to save the collected data
+# Online evaluation settings
+online_evaluation:
+  num_episodes: 10000  # Number of episodes for online evaluation
+  max_steps: 200  # Max length of each episode
+  seed: 24  # Random seed for online evaluation
+# FQE (Fitted Q Evaluation) settings

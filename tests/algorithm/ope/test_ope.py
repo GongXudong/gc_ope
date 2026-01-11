@@ -1,8 +1,26 @@
+ONLINE_EVAL = True  # 设置为 True 则只对评价策略 pi_e 进行在线评估，不进行 OPE 测试
+
 from pathlib import Path
 import numpy as np
 import torch as th
 import os
 import pickle
+
+PROJECT_ROOT_DIR = Path(__file__).absolute().parent.parent.parent.parent
+print(PROJECT_ROOT_DIR)
+
+import logging
+import time
+from datetime import datetime
+# 配置基础日志
+logging.basicConfig(
+    level=logging.INFO,  # 设置日志级别
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+    filename=Path(__file__).absolute().parent / f"{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log"
+)
+# 获取logger
+logger = logging.getLogger(__name__)
 
 from stable_baselines3 import SAC, PPO
 from stable_baselines3.common.evaluation import evaluate_policy
@@ -18,30 +36,38 @@ from gc_ope.algorithm.ope.estimators import (
     dm_compute_trajectory_values, tis_compute_trajectory_values, dr_compute_trajectory_values
 )
 
-PROJECT_ROOT_DIR = Path().absolute().parent.parent.parent
-print(PROJECT_ROOT_DIR)
+
 
 device = 'cuda' if th.cuda.is_available() else 'cpu'
-print(f"Using device: {device}")
+logger.info(f"Using device: {device}")
 
-#================
-#STEP1： 准备环境与策略
 env_cfg = load_config(
     config_path="../../../configs/train",
     config_name="config",
 )
 
-# TODO: 改为从"../../../configs/ope/config.yaml"中读取OPE评估的环境和策略参数、行为策略采样参数、在线评估参数、FQE参数
-# TODO: 需要对应修改env_cfg.algo，env_cfg.env
-ckpt_path_1 = PROJECT_ROOT_DIR / "checkpoints/flycraft/sac/seed_1/best_model"
-ckpt_path_2 = PROJECT_ROOT_DIR / "checkpoints/flycraft/sac/seed_2/best_model"
+ope_cfg = load_config(
+    config_path="../../../configs/ope",
+    config_name="config",
+)
+
+# DONE: 改为从"../../../configs/ope/config.yaml"中读取OPE评估的环境和策略参数、行为策略采样参数、在线评估参数、FQE参数
+ckpt_path_1 = PROJECT_ROOT_DIR / f"checkpoints/{ope_cfg.env}/{ope_cfg.algo}/seed_1/best_model"
+ckpt_path_2 = PROJECT_ROOT_DIR / f"checkpoints/{ope_cfg.env}/{ope_cfg.algo}/seed_2/best_model"
 
 # 根据checkpoint路径确定环境
-if "flycraft" in str(ckpt_path_1):
-    env_cfg.env.env_id = "FlyCraft-v0"
-elif "flycraft" in str(ckpt_path_2):
-    env_cfg.env.env_id = "FlyCraft-v0"
+# if "flycraft" in str(ckpt_path_1):
+#     env_cfg.env.env_id = "FlyCraft-v0" #NOTE: 只有env_id需要修改
+# elif "my_reach" in str(ckpt_path_1):
+#     env_cfg.env.env_id = "MyReachSparse-v0" #sac，sparse
+env_cfg.env.env_id = ope_cfg.env_id
 
+data_save_path = PROJECT_ROOT_DIR / f"{ope_cfg.data_collection.save_root}/{ope_cfg.env}_{ope_cfg.algo}_{ope_cfg.data_collection.num_episodes}eps.pkl"
+if not os.path.exists(data_save_path.parent):
+    os.makedirs(data_save_path.parent)
+
+#================
+#STEP1： 准备环境与策略
 env = get_env(env_cfg.env)
 
 # 根据checkpoint路径确定策略类型
@@ -58,30 +84,45 @@ else:
     raise ValueError(f"Unsupported algorithm: {ckpt_path_1}")
 
 gamma = float(getattr(eval_algo, "gamma", 0.99))
-print("gamma=", gamma)
+logger.info(f"gamma= {gamma}")
+
+
+# 在线评估真实回报（可选，耗时）
+if ONLINE_EVAL:
+    for randam_seed in [42]:
+        mean_r_e, std_r_e = evaluate_policy(eval_algo, env, n_eval_episodes=ope_cfg.online_evaluation.num_episodes, deterministic=True)
+        logger.info(f"eval return:     {mean_r_e:.2f} ± {std_r_e:.2f}")
+        # # mean_r_b, std_r_b = evaluate_policy(behavior_algo, env, n_eval_episodes=5, deterministic=True)
+        # mean_r_e, std_r_e = evaluate_policy(eval_algo, env, n_eval_episodes=1000, deterministic=True, randam_seed=42)
+        # # logger.info(f"behavior return: {mean_r_b:.2f} ± {std_r_b:.2f}")
+        # logger.info(f"eval return:     {mean_r_e:.2f} ± {std_r_e:.2f}")
+        # '''
+        # eval return:     -87.16 ± 50.82 # 100 episodes
+        # eval return:     -81.70 ± 53.87 # 1000 episodes
+        # '''
 
 #STEP2： 采样行为数据（已实现：数据采样和评价策略缓存分离）
 # 现在 collect_logged_dataset 只进行数据采样，评价策略缓存会在 build_ope_inputs 中自动计算
 # TODO：做日志存档
-n_episodes = 10
-max_steps = 400
+n_episodes = ope_cfg.data_collection.num_episodes
+max_steps = ope_cfg.data_collection.max_steps
 
-if not os.path.exists("dataset.pkl"):
-    print("Collecting dataset")
+if not os.path.exists(data_save_path):
+    logger.info("Collecting dataset")
     dataset = collect_logged_dataset(
         env=env,
         behavior_algo=behavior_algo,
         n_episodes=n_episodes,
         max_steps=max_steps,
     )
-    with open("dataset.pkl", "wb") as f:
+    with open(data_save_path, "wb") as f:
         pickle.dump(dataset, f)
-    print("Dataset collected & saved successfully")
+    logger.info(f"Dataset collected & saved to {data_save_path} successfully")
 else:
-    print("Loading dataset from file")
-    with open("dataset.pkl", "rb") as f:    
+    logger.info("Loading dataset from file")
+    with open(data_save_path, "rb") as f:    
         dataset = pickle.load(f)
-    print("Dataset loaded successfully")
+    logger.info("Dataset loaded successfully")
 
 #STEP3： 构造 OPE 输入（已实现：FQE 训练和预测集成到 build_ope_inputs）
 # FQE 训练和预测过程已集成，支持 q_function_method 参数（当前仅支持 "fqe"）
@@ -89,7 +130,7 @@ else:
 loss_log = []
 def _logger(epoch: int, loss: float):
     if epoch % 1 == 0 or epoch == 1:
-        print(f"Epoch {epoch:04d} | FQE loss={loss:.3f}")
+        logger.info(f"Epoch {epoch:04d} | FQE loss={loss:.3f}")
     loss_log.append((epoch, loss))
 
 inputs = build_ope_inputs(
@@ -117,8 +158,8 @@ inputs = build_ope_inputs(
         "device": device,
         # TODO：改为从config中设置是否使用goal-conditioned mode
         # 设置以下两个参数：obs_state_dim, goal_dim，会启动goal-conditioned mode
-        "obs_state_dim": dataset.obs_dict[0]['observation'].shape[0],
-        "goal_dim": dataset.obs_dict[0]['desired_goal'].shape[0],
+        # "obs_state_dim": dataset.obs_dict[0]['observation'].shape[0],
+        # "goal_dim": dataset.obs_dict[0]['desired_goal'].shape[0],
     },
 )
 '''
@@ -161,10 +202,10 @@ dm_all = dm_estimate(inputs, initial_only=False, ci_method="bootstrap")
 tis_res = tis_estimate(inputs, ci_method="bootstrap")
 dr_res = dr_estimate(inputs, ci_method="bootstrap")
 
-print("DM (step-wise):", dm_all)
-# print("DM (initial-state):", dm_init)
-print("TIS:", tis_res) #TODO: 解决TIS计算报错的问题
-print("DR:", dr_res)
+logger.info(f"DM (step-wise): {dm_all}")
+# logger.info("DM (initial-state):", dm_init)
+logger.info(f"TIS: {tis_res}") #TODO: 解决TIS计算报错的问题
+logger.info(f"DR: {dr_res}")
 '''
 /home/maxine/ai4robot/gc_ope/src/gc_ope/algorithm/ope/estimators.py:184: RuntimeWarning: overflow encountered in exp
   weight = np.exp((logp_e - logp_b).sum())
@@ -184,13 +225,3 @@ DM (step-wise): EstimateResult(mean=-55.72665023803711, ci_lower=-55.89229583740
 TIS: EstimateResult(mean=-inf, ci_lower=nan, ci_upper=nan)
 DR: EstimateResult(mean=nan, ci_lower=nan, ci_upper=nan)
 '''
-
-# 在线评估真实回报（可选，耗时）
-if False:
-    # mean_r_b, std_r_b = evaluate_policy(behavior_algo, env, n_eval_episodes=5, deterministic=True)
-    mean_r_e, std_r_e = evaluate_policy(eval_algo, env, n_eval_episodes=1000, deterministic=True)
-    # print(f"behavior return: {mean_r_b:.2f} ± {std_r_b:.2f}")
-    print(f"eval return:     {mean_r_e:.2f} ± {std_r_e:.2f}")
-    '''
-    eval return:     -87.16 ± 50.82
-    '''
