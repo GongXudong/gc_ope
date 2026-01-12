@@ -244,6 +244,78 @@ def tis_estimate(
     return compute_estimate_with_ci(trajectory_values, ci_method=ci_method, **ci_kwargs)
 
 
+def pdis_compute_trajectory_values(inputs: OPEInputs) -> np.ndarray:
+    r"""Compute trajectory-level values for Per-Decision Importance Sampling (PDIS).
+
+    PDIS uses step-wise cumulative importance weights instead of trajectory-level
+    weights, resulting in lower variance than TIS while remaining unbiased.
+
+    Args:
+        inputs: OPE inputs containing rewards, log-probs, and trajectory info.
+
+    Returns:
+        Array of weighted returns (M,) where M is the number of trajectories.
+    """
+    traj_map = _traj_slices(inputs.traj_id)
+    gamma = inputs.gamma
+    returns = []
+
+    for idxs in traj_map.values():
+        r = inputs.rewards[idxs]
+        logp_b = inputs.behavior_log_prob[idxs]
+        logp_e = inputs.eval_log_prob[idxs]
+
+        # Step-wise cumulative log-importance weights
+        log_ratios = np.clip(logp_e - logp_b, -10.0, 10.0)
+        log_cum_weights = np.cumsum(log_ratios)
+        log_cum_weights = np.clip(log_cum_weights, -20.0, 10.0)
+        cum_weights = np.exp(log_cum_weights)
+        cum_weights = np.clip(cum_weights, 0.0, 1e4)
+
+        # Apply step-wise weights to each reward
+        discounts = np.power(gamma, np.arange(len(r)))
+        returns.append(np.sum(discounts * cum_weights * r))
+
+    return np.asarray(returns, dtype=np.float32)
+
+
+def pdis_estimate(
+    inputs: OPEInputs, ci_method: CI_METHOD = "bootstrap", **ci_kwargs
+) -> EstimateResult:
+    r"""Per-Decision Importance Sampling (PDIS) estimator.
+
+    PDIS estimates the policy value using step-wise cumulative importance weights:
+
+    .. math::
+
+        \hat{V}^{\text{PDIS}} = \frac{1}{M} \sum_{\tau=1}^M \sum_{t=0}^{T-1}
+            \gamma^t w_{0:t} r_t
+
+    Plain text: V^PDIS = (1/M) * sum_τ sum_t γ^t * w_{0:t} * r_t
+
+    where the cumulative importance weight is:
+
+    .. math::
+
+        w_{0:t} = \prod_{t'=0}^{t} \frac{\pi_{\text{eval}}(a_{t'} | s_{t'})}
+            {\pi_{\text{behavior}}(a_{t'} | s_{t'})}
+
+    Plain text: w_{0:t} = prod_{t'=0}^t [π_eval(a_t'|s_t') / π_behavior(a_t'|s_t')]
+
+    PDIS has lower variance than TIS because weights grow more slowly.
+
+    Args:
+        inputs: OPE inputs containing rewards, log-probs, and trajectory info.
+        ci_method: Method for computing confidence interval (default: "bootstrap").
+        **ci_kwargs: Additional arguments for CI computation.
+
+    Returns:
+        EstimateResult with mean estimate and 95% confidence interval.
+    """
+    trajectory_values = pdis_compute_trajectory_values(inputs)
+    return compute_estimate_with_ci(trajectory_values, ci_method=ci_method, **ci_kwargs)
+
+
 def dr_compute_trajectory_values(inputs: OPEInputs) -> np.ndarray:
     r"""Compute trajectory-level values for Doubly Robust (DR) estimator.
 
@@ -334,4 +406,238 @@ def dr_estimate(
         EstimateResult with mean estimate and 95% confidence interval.
     """
     trajectory_values = dr_compute_trajectory_values(inputs)
+    return compute_estimate_with_ci(trajectory_values, ci_method=ci_method, **ci_kwargs)
+
+
+# =============================================================================
+# Kernel-based estimators for continuous action spaces
+# =============================================================================
+
+def tis_compute_trajectory_values_kernel(
+    inputs: OPEInputs,
+    kernel: str = "gaussian",
+    bandwidth: float = 1.0,
+) -> np.ndarray:
+    r"""Compute trajectory-level values for TIS using kernel similarity weights.
+
+    Uses kernel function similarity instead of probability density ratio for
+    continuous action spaces. This avoids numerical instability issues.
+
+    Args:
+        inputs: OPE inputs containing actions, rewards, and trajectory info.
+        kernel: Kernel function name ("gaussian" or "epanechnikov").
+        bandwidth: Kernel bandwidth hyperparameter (default: 1.0).
+
+    Returns:
+        Array of weighted returns (M,) where M is the number of trajectories.
+    """
+    from .kernel_utils import get_kernel
+
+    kernel_fn = get_kernel(kernel)
+    traj_map = _traj_slices(inputs.traj_id)
+    gamma = inputs.gamma
+    returns = []
+
+    for idxs in traj_map.values():
+        r = inputs.rewards[idxs]
+        actions = inputs.actions[idxs]
+        eval_actions = inputs.eval_action[idxs]
+        logp_b = inputs.behavior_log_prob[idxs]
+
+        # Compute kernel similarity for each step
+        similarity = kernel_fn(eval_actions, actions, bandwidth=bandwidth)
+        print("similarity:", similarity) # 监控similarity值
+
+        # Trajectory-wise similarity weight (product over all steps)
+        similarity_weight = similarity.prod()
+
+        # Behavior policy probability (product over all steps)
+        behavior_prob = np.exp(np.clip(logp_b.sum(), -20.0, 20.0))
+
+        # TIS weight = similarity / behavior_prob
+        weight = similarity_weight / max(behavior_prob, 1e-10)
+
+        discounts = np.power(gamma, np.arange(len(r)))
+        returns.append(weight * np.sum(discounts * r))
+
+    return np.asarray(returns, dtype=np.float32)
+
+
+def tis_estimate_kernel(
+    inputs: OPEInputs,
+    kernel: str = "gaussian",
+    bandwidth: float = 1.0,
+    ci_method: CI_METHOD = "bootstrap",
+    **ci_kwargs,
+) -> EstimateResult:
+    r"""TIS estimator using kernel similarity weights for continuous actions.
+
+    Args:
+        inputs: OPE inputs containing actions, rewards, and trajectory info.
+        kernel: Kernel function name ("gaussian" or "epanechnikov").
+        bandwidth: Kernel bandwidth hyperparameter (default: 1.0).
+        ci_method: Method for computing confidence interval (default: "bootstrap").
+        **ci_kwargs: Additional arguments for CI computation.
+
+    Returns:
+        EstimateResult with mean estimate and confidence interval.
+    """
+    trajectory_values = tis_compute_trajectory_values_kernel(
+        inputs, kernel=kernel, bandwidth=bandwidth
+    )
+    return compute_estimate_with_ci(trajectory_values, ci_method=ci_method, **ci_kwargs)
+
+
+def dr_compute_trajectory_values_kernel(
+    inputs: OPEInputs,
+    kernel: str = "gaussian",
+    bandwidth: float = 1.0,
+) -> np.ndarray:
+    r"""Compute trajectory-level values for DR using kernel similarity weights.
+
+    Uses kernel function similarity instead of probability density ratio for
+    continuous action spaces. This avoids numerical instability issues.
+
+    Args:
+        inputs: OPE inputs containing actions, rewards, Q-values, and trajectory info.
+        kernel: Kernel function name ("gaussian" or "epanechnikov").
+        bandwidth: Kernel bandwidth hyperparameter (default: 1.0).
+
+    Returns:
+        Array of DR estimates (M,) where M is the number of trajectories.
+    """
+    from .kernel_utils import get_kernel
+
+    kernel_fn = get_kernel(kernel)
+    traj_map = _traj_slices(inputs.traj_id)
+    gamma = inputs.gamma
+    est = []
+
+    for idxs in traj_map.values():
+        r = inputs.rewards[idxs]
+        actions = inputs.actions[idxs]
+        eval_actions = inputs.eval_action[idxs]
+        logp_b = inputs.behavior_log_prob[idxs]
+        q_sa = inputs.q_sa_behavior[idxs]
+        v_eval = inputs.q_sa_eval[idxs]
+
+        # Compute kernel similarity for each step
+        similarity = kernel_fn(eval_actions, actions, bandwidth=bandwidth)
+
+        # Step-wise cumulative similarity weight
+        similarity_weight = np.cumprod(similarity)
+
+        # Step-wise behavior policy probability
+        behavior_prob = np.exp(np.clip(np.cumsum(logp_b), -20.0, 20.0))
+
+        # Step-wise importance weight
+        w_step = similarity_weight / np.maximum(behavior_prob, 1e-10)
+
+        # Previous step weights (w_{-1} = 1)
+        w_prev = np.concatenate([[1.0], w_step[:-1]])
+
+        discounts = np.power(gamma, np.arange(len(r)))
+        term = w_step * (r - q_sa) + w_prev * v_eval
+        est.append(np.sum(discounts * term))
+
+    return np.asarray(est, dtype=np.float32)
+
+
+def dr_estimate_kernel(
+    inputs: OPEInputs,
+    kernel: str = "gaussian",
+    bandwidth: float = 1.0,
+    ci_method: CI_METHOD = "bootstrap",
+    **ci_kwargs,
+) -> EstimateResult:
+    r"""DR estimator using kernel similarity weights for continuous actions.
+
+    Args:
+        inputs: OPE inputs containing actions, rewards, Q-values, and trajectory info.
+        kernel: Kernel function name ("gaussian" or "epanechnikov").
+        bandwidth: Kernel bandwidth hyperparameter (default: 1.0).
+        ci_method: Method for computing confidence interval (default: "bootstrap").
+        **ci_kwargs: Additional arguments for CI computation.
+
+    Returns:
+        EstimateResult with mean estimate and confidence interval.
+    """
+    trajectory_values = dr_compute_trajectory_values_kernel(
+        inputs, kernel=kernel, bandwidth=bandwidth
+    )
+    return compute_estimate_with_ci(trajectory_values, ci_method=ci_method, **ci_kwargs)
+
+
+def pdis_compute_trajectory_values_kernel(
+    inputs: OPEInputs,
+    kernel: str = "gaussian",
+    bandwidth: float = 1.0,
+) -> np.ndarray:
+    r"""Compute trajectory-level values for PDIS using kernel similarity weights.
+
+    Uses kernel function similarity instead of probability density ratio for
+    continuous action spaces. This avoids numerical instability issues.
+
+    Args:
+        inputs: OPE inputs containing actions, rewards, and trajectory info.
+        kernel: Kernel function name ("gaussian" or "epanechnikov").
+        bandwidth: Kernel bandwidth hyperparameter (default: 1.0).
+
+    Returns:
+        Array of weighted returns (M,) where M is the number of trajectories.
+    """
+    from .kernel_utils import get_kernel
+
+    kernel_fn = get_kernel(kernel)
+    traj_map = _traj_slices(inputs.traj_id)
+    gamma = inputs.gamma
+    returns = []
+
+    for idxs in traj_map.values():
+        r = inputs.rewards[idxs]
+        actions = inputs.actions[idxs]
+        eval_actions = inputs.eval_action[idxs]
+        logp_b = inputs.behavior_log_prob[idxs]
+
+        # Compute kernel similarity for each step
+        similarity = kernel_fn(eval_actions, actions, bandwidth=bandwidth)
+
+        # Step-wise cumulative similarity weight
+        similarity_weight = np.cumprod(similarity)
+
+        # Step-wise behavior policy probability
+        behavior_prob = np.exp(np.clip(np.cumsum(logp_b), -20.0, 20.0))
+
+        # Step-wise importance weight
+        w_step = similarity_weight / np.maximum(behavior_prob, 1e-10)
+
+        # Apply step-wise weights to each reward
+        discounts = np.power(gamma, np.arange(len(r)))
+        returns.append(np.sum(discounts * w_step * r))
+
+    return np.asarray(returns, dtype=np.float32)
+
+
+def pdis_estimate_kernel(
+    inputs: OPEInputs,
+    kernel: str = "gaussian",
+    bandwidth: float = 1.0,
+    ci_method: CI_METHOD = "bootstrap",
+    **ci_kwargs,
+) -> EstimateResult:
+    r"""PDIS estimator using kernel similarity weights for continuous actions.
+
+    Args:
+        inputs: OPE inputs containing actions, rewards, and trajectory info.
+        kernel: Kernel function name ("gaussian" or "epanechnikov").
+        bandwidth: Kernel bandwidth hyperparameter (default: 1.0).
+        ci_method: Method for computing confidence interval (default: "bootstrap").
+        **ci_kwargs: Additional arguments for CI computation.
+
+    Returns:
+        EstimateResult with mean estimate and confidence interval.
+    """
+    trajectory_values = pdis_compute_trajectory_values_kernel(
+        inputs, kernel=kernel, bandwidth=bandwidth
+    )
     return compute_estimate_with_ci(trajectory_values, ci_method=ci_method, **ci_kwargs)
