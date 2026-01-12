@@ -1,4 +1,4 @@
-ONLINE_EVAL = True  # 设置为 True 则只对评价策略 pi_e 进行在线评估，不进行 OPE 测试
+ONLINE_EVAL = False  # 设置为 True 则只对评价策略 pi_e 进行在线评估，不进行 OPE 测试
 
 from pathlib import Path
 import numpy as np
@@ -26,9 +26,13 @@ from gc_ope.algorithm.ope.logged_dataset import collect_logged_dataset, compute_
 from gc_ope.algorithm.ope.fqe import FQETrainer
 from gc_ope.algorithm.ope.ope_input import build_ope_inputs
 from gc_ope.algorithm.ope.estimators import (
-    dm_estimate, tis_estimate, dr_estimate, pdis_estimate, 
-    dm_compute_trajectory_values, tis_compute_trajectory_values, dr_compute_trajectory_values,
-    tis_estimate_kernel, dr_estimate_kernel, pdis_estimate_kernel,
+    DMEstimator,
+    TISEstimator,
+    PDISEstimator,
+    DREstimator,
+    SelfNormalizedTIS,
+    SelfNormalizedPDIS,
+    SelfNormalizedDR,
 )
 
 
@@ -147,7 +151,7 @@ def test_ope(ope_cfg: DictConfig) -> None:
         # q_function_method="fqe",  # 默认 "fqe"
         fqe_train_kwargs={
             "batch_size": 512,  # 增大batch size加速训练
-            "n_epochs": 100,
+            "n_epochs": 50,
             "shuffle": True,
             "logger": _logger,
             "gradient_clip": 1.0,  # 梯度裁剪防止梯度爆炸
@@ -202,24 +206,48 @@ def test_ope(ope_cfg: DictConfig) -> None:
     '''
 
     #STEP4： 计算 OPE 估计值
-    # 支持 ci_method 参数："bootstrap"（默认）、"normal"、"t_test"
-    dm_all = dm_estimate(inputs, initial_only=False, ci_method="bootstrap")
-    # dm_init = dm_estimate(inputs, initial_only=True, ci_method="bootstrap")
-    tis_res = tis_estimate(inputs, ci_method="bootstrap")
-    pdis_res = pdis_estimate(inputs, ci_method="bootstrap")
-    dr_res = dr_estimate(inputs, ci_method="bootstrap")
-    tis_res_kernel = tis_estimate_kernel(inputs, kernel="gaussian", bandwidth=1.0)
-    pdis_res_kernel = pdis_estimate_kernel(inputs, kernel="gaussian", bandwidth=1.0)
-    dr_res_kernel = dr_estimate_kernel(inputs, kernel="gaussian", bandwidth=1.0)
+    # 使用新的类API，支持kernel和self-normalize
+    dm_estimator = DMEstimator(gamma=gamma)
+    tis_estimator = TISEstimator(gamma=gamma, use_kernel=False)
+    pdis_estimator = PDISEstimator(gamma=gamma, use_kernel=False)
+    dr_estimator = DREstimator(gamma=gamma, use_kernel=False)
 
-    logger.info(f"DM (step-wise): {dm_all}")
-    # logger.info("DM (initial-state):", dm_init)
-    logger.info(f"TIS: {tis_res}") #TODO: 解决TIS计算报错的问题
-    logger.info(f"PDIS: {pdis_res}")
-    logger.info(f"DR: {dr_res}")
-    logger.info(f"TIS (kernel): {tis_res_kernel}")
-    logger.info(f"PDIS (kernel): {pdis_res_kernel}")
-    logger.info(f"DR (kernel): {dr_res_kernel}")
+    # Kernel版本（使用纯相似度核函数，解决权重过小问题）
+    # 
+    for kernel_type in ["gaussian", "epanechnikov", "triangular", "cosine", "uniform"]:
+        logger.info(f"Testing OPE estimators with kernel: {kernel_type}=========")
+        tis_kernel = TISEstimator(gamma=gamma, use_kernel=True, kernel=kernel_type, bandwidth="auto")
+        pdis_kernel = PDISEstimator(gamma=gamma, use_kernel=True, kernel=kernel_type, bandwidth="auto")
+        dr_kernel = DREstimator(gamma=gamma, use_kernel=True, kernel=kernel_type, bandwidth="auto")
+
+        # 自归一化版本（进一步稳定数值）
+        sn_tis = SelfNormalizedTIS(gamma=gamma, use_kernel=True, kernel=kernel_type, bandwidth="auto")
+        sn_pdis = SelfNormalizedPDIS(gamma=gamma, use_kernel=True, kernel=kernel_type, bandwidth="auto")
+        sn_dr = SelfNormalizedDR(gamma=gamma, use_kernel=True, kernel=kernel_type, bandwidth="auto")
+
+        dm_res = dm_estimator.estimate(inputs, ci_method="bootstrap")
+        tis_res = tis_estimator.estimate(inputs, ci_method="bootstrap")
+        pdis_res = pdis_estimator.estimate(inputs, ci_method="bootstrap")
+        dr_res = dr_estimator.estimate(inputs, ci_method="bootstrap")
+
+        tis_kernel_res = tis_kernel.estimate(inputs, ci_method="bootstrap")
+        pdis_kernel_res = pdis_kernel.estimate(inputs, ci_method="bootstrap")
+        dr_kernel_res = dr_kernel.estimate(inputs, ci_method="bootstrap")
+
+        sn_tis_res = sn_tis.estimate(inputs, ci_method="bootstrap")
+        sn_pdis_res = sn_pdis.estimate(inputs, ci_method="bootstrap")
+        sn_dr_res = sn_dr.estimate(inputs, ci_method="bootstrap")
+
+        logger.info(f"DM: {dm_res}")
+        logger.info(f"TIS: {tis_res}")
+        logger.info(f"PDIS: {pdis_res}")
+        logger.info(f"DR: {dr_res}")
+        logger.info(f"TIS (kernel): {tis_kernel_res}")
+        logger.info(f"PDIS (kernel): {pdis_kernel_res}")
+        logger.info(f"DR (kernel): {dr_kernel_res}")
+        logger.info(f"SN-TIS: {sn_tis_res}")
+        logger.info(f"SN-PDIS: {sn_pdis_res}")
+        logger.info(f"SN-DR: {sn_dr_res}")
     '''
     /home/maxine/ai4robot/gc_ope/src/gc_ope/algorithm/ope/estimators.py:184: RuntimeWarning: overflow encountered in exp
       weight = np.exp((logp_e - logp_b).sum())
