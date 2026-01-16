@@ -54,11 +54,16 @@ class PDISEstimator(BaseISEstimator):
             discounts = np.power(gamma, np.arange(len(r)))
 
             if self.use_kernel:
-                # Kernel-based cumulative weights
+                # Kernel-based cumulative weights (use log-space to avoid underflow)
                 similarity = self._compute_kernel_similarity(
                     inputs, idxs, bandwidth
                 )
-                cum_weights = np.cumprod(similarity)
+                # Add epsilon to avoid log(0) for bounded kernels
+                log_sim = np.log(similarity + 1e-10)
+                log_cum_weights = np.cumsum(log_sim)
+                # Clip to avoid overflow/underflow
+                log_cum_weights = np.clip(log_cum_weights, -20.0, 10.0)
+                cum_weights = np.exp(log_cum_weights)
             else:
                 # Log-probability based cumulative weights
                 logp_b = inputs.behavior_log_prob[idxs]

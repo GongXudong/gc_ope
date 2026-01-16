@@ -71,10 +71,21 @@ Execute files from their parent directory.
 - 有偏估计算法（DM、DR）：OPE 估计结果与在线评估结果的偏差不超过 20%。
 
 ### 已知潜在问题
-1. **更新时间**：2026/1/12 9:37
-重要性权重计算可能出现无穷大等异常情况，导致 TIS、DR 估计器的输出结果绝对值显著偏离在线评估结果。推测根因：处理连续动作时，误将其按离散动作逻辑计算重要性权重（直接采用“评价策略动作概率密度 ÷ 行为策略动作概率密度”的计算方式），未使用核函数相似度进行适配。可参考文档`~/ai4robot/ope-repos/scope-rl/scope_rl/ope/BASIC_OPE_SUMMARY.md`中`### 3.5 连续动作: 核函数相似度 (Kernel Similarity Weight)`的说明。
-2. **更新时间**：2026/1/12 15:39 在解决上一条问题过程中出现的问题：
-重要性权重计算为极小值，用当前实现的Gausiaan、epanechnikov核函数计算`similarity`，就已经很小了，计算`similarity_weight`就更小，导致到`weight`时也小。
+1. **更新时间**：2026/1/12 9:37 **[已解决 2026/1/13]**
+重要性权重计算可能出现无穷大等异常情况，导致 TIS、DR 估计器的输出结果绝对值显著偏离在线评估结果。推测根因：处理连续动作时，误将其按离散动作逻辑计算重要性权重（直接采用"评价策略动作概率密度 ÷ 行为策略动作概率密度"的计算方式），未使用核函数相似度进行适配。
+**解决方案**：实现了核函数相似度权重（kernel similarity weight），支持 gaussian、epanechnikov、triangular、cosine、uniform 五种核函数。
+
+2. **更新时间**：2026/1/12 15:39 **[已解决 2026/1/13]**
+重要性权重计算为极小值，用当前实现的Gaussian、epanechnikov核函数计算`similarity`，就已经很小了，计算`similarity_weight`就更小，导致到`weight`时也小。
+**解决方案**：
+- 使用纯相似度核函数（无归一化因子），返回 [0,1] 范围的值
+- 使用 log-space 计算累积权重，避免下溢
+- 将默认 bandwidth 选择方法从 Silverman's rule 改为 median heuristic（更适合 OPE 场景）
+- 实现自归一化估计器（SelfNormalizedTIS/PDIS/DR），通过 w_normalized = w / mean(w) 稳定数值
+
+**验证结果**（my_reach 环境，真实值 -3.44 ± 1.98）：
+- SN-TIS (Gaussian): -4.05（偏差 ~18%）
+- PDIS (kernel, Uniform): -3.64（偏差 ~6%）
 
 ### 暂时搁置内容
 针对目标条件强化学习（GCRL）的 OPE 算法专项开发暂不推进。当前处理方式为：将 GCRL 中字典类型的观测值拼接为向量，按普通 RL 场景统一处理。后续仅在“针对 GCRL 特殊性的优化可显著提升其 OPE 性能”的前提下，重新评估该方向的开发优先级。

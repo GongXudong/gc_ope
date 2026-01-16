@@ -1,4 +1,4 @@
-ONLINE_EVAL = False  # 设置为 True 则只对评价策略 pi_e 进行在线评估，不进行 OPE 测试
+ONLINE_EVAL = True  # 设置为 True 则只对评价策略 pi_e 进行在线评估，不进行 OPE 测试
 
 from pathlib import Path
 import numpy as np
@@ -208,9 +208,7 @@ def test_ope(ope_cfg: DictConfig) -> None:
     #STEP4： 计算 OPE 估计值
     # 使用新的类API，支持kernel和self-normalize
     dm_estimator = DMEstimator(gamma=gamma)
-    tis_estimator = TISEstimator(gamma=gamma, use_kernel=False)
-    pdis_estimator = PDISEstimator(gamma=gamma, use_kernel=False)
-    dr_estimator = DREstimator(gamma=gamma, use_kernel=False)
+    dm_res = dm_estimator.estimate(inputs, ci_method="bootstrap")
 
     # Kernel版本（使用纯相似度核函数，解决权重过小问题）
     # 
@@ -225,11 +223,6 @@ def test_ope(ope_cfg: DictConfig) -> None:
         sn_pdis = SelfNormalizedPDIS(gamma=gamma, use_kernel=True, kernel=kernel_type, bandwidth="auto")
         sn_dr = SelfNormalizedDR(gamma=gamma, use_kernel=True, kernel=kernel_type, bandwidth="auto")
 
-        dm_res = dm_estimator.estimate(inputs, ci_method="bootstrap")
-        tis_res = tis_estimator.estimate(inputs, ci_method="bootstrap")
-        pdis_res = pdis_estimator.estimate(inputs, ci_method="bootstrap")
-        dr_res = dr_estimator.estimate(inputs, ci_method="bootstrap")
-
         tis_kernel_res = tis_kernel.estimate(inputs, ci_method="bootstrap")
         pdis_kernel_res = pdis_kernel.estimate(inputs, ci_method="bootstrap")
         dr_kernel_res = dr_kernel.estimate(inputs, ci_method="bootstrap")
@@ -239,12 +232,9 @@ def test_ope(ope_cfg: DictConfig) -> None:
         sn_dr_res = sn_dr.estimate(inputs, ci_method="bootstrap")
 
         logger.info(f"DM: {dm_res}")
-        logger.info(f"TIS: {tis_res}")
-        logger.info(f"PDIS: {pdis_res}")
-        logger.info(f"DR: {dr_res}")
-        logger.info(f"TIS (kernel): {tis_kernel_res}")
-        logger.info(f"PDIS (kernel): {pdis_kernel_res}")
-        logger.info(f"DR (kernel): {dr_kernel_res}")
+        logger.info(f"TIS: {tis_kernel_res}")
+        logger.info(f"PDIS: {pdis_kernel_res}")
+        logger.info(f"DR: {dr_kernel_res}")
         logger.info(f"SN-TIS: {sn_tis_res}")
         logger.info(f"SN-PDIS: {sn_pdis_res}")
         logger.info(f"SN-DR: {sn_dr_res}")

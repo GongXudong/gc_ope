@@ -204,8 +204,10 @@ class BaseISEstimator(BaseOPEEstimator):
         if isinstance(self.bandwidth, (int, float)):
             return float(self.bandwidth)
         elif self.bandwidth == "auto":
-            # Use action data for bandwidth selection
-            return select_bandwidth(inputs.actions, method="silverman")
+            # Use median heuristic for OPE (Silverman's rule is too small)
+            # Median heuristic gives bandwidth ~ typical action distance,
+            # which keeps similarity values reasonable for long trajectories
+            return select_bandwidth(inputs.actions, method="median")
         else:
             raise ValueError(f"Invalid bandwidth: {self.bandwidth}")
 

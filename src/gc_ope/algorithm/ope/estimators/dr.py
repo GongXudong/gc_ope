@@ -58,11 +58,16 @@ class DREstimator(BaseISEstimator):
             discounts = np.power(gamma, np.arange(len(r)))
 
             if self.use_kernel:
-                # Kernel-based cumulative weights
+                # Kernel-based cumulative weights (use log-space to avoid underflow)
                 similarity = self._compute_kernel_similarity(
                     inputs, idxs, bandwidth
                 )
-                w_step = np.cumprod(similarity)
+                # Add epsilon to avoid log(0) for bounded kernels
+                log_sim = np.log(similarity + 1e-10)
+                log_cum_weights = np.cumsum(log_sim)
+                # Clip to avoid overflow/underflow
+                log_cum_weights = np.clip(log_cum_weights, -20.0, 10.0)
+                w_step = np.exp(log_cum_weights)
             else:
                 # Log-probability based cumulative weights
                 logp_b = inputs.behavior_log_prob[idxs]
@@ -74,20 +79,24 @@ class DREstimator(BaseISEstimator):
             # Previous step weights (w_{-1} = 1)
             w_prev = np.concatenate([[1.0], w_step[:-1]])
 
-            # DR term: w_t * (r_t - Q(s_t, a_t)) + w_{t-1} * V(s_t)
-            term = w_step * (r - q_sa) + w_prev * v_eval
+            if self.self_normalize:
+                # For SN-DR: use a modified normalization that doesn't explode
+                # The issue is w_prev[0]=1.0 is a boundary condition, not a weight
+                # We normalize w_step, and scale w_prev consistently
+                mean_w = w_step.mean() + 1e-10
+                w_step_norm = w_step / mean_w
+                # For w_prev, normalize the actual weights but keep w_prev[0] = 1
+                # This maintains the DR structure while avoiding explosion
+                w_prev_norm = np.concatenate([[1.0], w_step_norm[:-1]])
+                # DR term with normalized weights
+                term = w_step_norm * (r - q_sa) + w_prev_norm * v_eval
+                all_values.append(np.sum(discounts * term))
+            else:
+                # DR term: w_t * (r_t - Q(s_t, a_t)) + w_{t-1} * V(s_t)
+                term = w_step * (r - q_sa) + w_prev * v_eval
+                all_values.append(np.sum(discounts * term))
 
-            # Store mean weight for self-normalization
-            all_weights.append(w_step.mean())
-            all_values.append(np.sum(discounts * term))
-
-        weights = np.asarray(all_weights, dtype=np.float32)
         values = np.asarray(all_values, dtype=np.float32)
-
-        if self.self_normalize:
-            norm_factor = weights.mean() + 1e-10
-            values = values / norm_factor
-
         return values
 
 

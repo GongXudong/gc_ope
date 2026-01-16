@@ -53,12 +53,16 @@ class TISEstimator(BaseISEstimator):
             returns.append(G)
 
             if self.use_kernel:
-                # Kernel-based weight
+                # Kernel-based weight (use log-space to avoid underflow)
                 similarity = self._compute_kernel_similarity(
                     inputs, idxs, bandwidth
                 )
-                # Trajectory weight = product of step similarities
-                weight = similarity.prod()
+                # Add epsilon to avoid log(0) for bounded kernels
+                log_sim = np.log(similarity + 1e-10)
+                log_weight = log_sim.sum()
+                # Clip to avoid overflow/underflow
+                log_weight = np.clip(log_weight, -20.0, 10.0)
+                weight = np.exp(log_weight)
             else:
                 # Log-probability based weight
                 logp_b = inputs.behavior_log_prob[idxs]
