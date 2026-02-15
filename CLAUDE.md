@@ -87,6 +87,10 @@ Execute files from their parent directory.
 - SN-TIS (Gaussian): -4.05（偏差 ~18%）
 - PDIS (kernel, Uniform): -3.64（偏差 ~6%）
 
+3. **更新时间**：2026/1/17 8:40 
+- flycraft环境，her算法，测试中DM估计器里FQE的训练loss急剧升高，迅速大于1（不像其他环境下loss虽然在升，但稳定小于1），导致DM算法估计过高，DR类算法估计过小。详见日志[flycraft-her日志](scripts/ope/outputs/flycraft_her_10000_all_20260116_213857)
+- 进一步挖原因，是因为flycraft环境下单episode轨迹step很长，大概都在100~300（最长400），不像其他三个环境reach push slide大概都在10左右（最长50）。
+
 ### 暂时搁置内容
 针对目标条件强化学习（GCRL）的 OPE 算法专项开发暂不推进。当前处理方式为：将 GCRL 中字典类型的观测值拼接为向量，按普通 RL 场景统一处理。后续仅在“针对 GCRL 特殊性的优化可显著提升其 OPE 性能”的前提下，重新评估该方向的开发优先级。
 

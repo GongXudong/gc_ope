@@ -23,6 +23,7 @@
 ### 刚完成的事
 1. 以上一个todo，实现长期开发路线，解决了重要性采样方法极小的问题（见[CLAUDE.md](../../../../CLAUDE.md)### 已知潜在问题 第2点）。
 ### 等会儿接着做的事情
-- [ ] 对评估策略用来自行为策略数据的 goal 做评估，代码可参考[eval](../../../../scripts/evaluate_ckpt/evaluate_flycraft.py)。
-- [ ] 补充运行flycraft环境、课程学习 omega 算法。
+- [x] 对评估策略用来自行为策略数据的 goal 做评估，代码可参考[eval](../../../../scripts/evaluate_ckpt/evaluate_flycraft.py)。
+  - 实现一半，[reach](evaluation/evaluate_my_reach.py)上待解决TODO即完成 2026/1/16 22:31
+- [x] 补充运行flycraft环境、课程学习 omega 算法。
 - [ ] 整理 OPE 算法核心公式，①包含进GCRL的goal，②结合代码库里的实现，交给师兄review。

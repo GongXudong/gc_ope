@@ -51,7 +51,7 @@ class OPEInputs:
 
 
 def _ensure_eval_actions(
-    dataset: LoggedDataset, eval_algo: BaseAlgorithm
+    dataset: LoggedDataset, eval_algo: BaseAlgorithm, logger: Any = None
 ) -> tuple[np.ndarray, np.ndarray]:
     """Ensure evaluation policy actions and log-probs are available.
 
@@ -71,7 +71,7 @@ def _ensure_eval_actions(
     compute_eval_policy_cache(dataset, eval_algo)
     with open('dataset.pkl', 'wb') as f:
         pickle.dump(dataset, f)
-    print("Eval policy actions/log-probs are computed & saved to dataset.pkl")
+    logger.info("Eval policy actions/log-probs are computed & saved to dataset.pkl")
     return dataset.eval_action_curr, dataset.eval_log_prob_curr
 
 
@@ -79,6 +79,7 @@ def build_ope_inputs(
     dataset: LoggedDataset,
     eval_algo: BaseAlgorithm,
     gamma: float,
+    logger: None,
     fqe: Optional[FQETrainer] = None,
     q_function_method: str = "fqe",
     fqe_train_kwargs: Optional[Dict[str, Any]] = None,
@@ -112,9 +113,9 @@ def build_ope_inputs(
         to the user. This simplifies the API and ensures consistent usage.
     """
     # Ensure eval policy actions/log-probs are available
-    print("Ensure eval policy actions/log-probs are available")
-    eval_actions, eval_log_prob = _ensure_eval_actions(dataset, eval_algo)
-    print("Eval policy actions/log-probs are available")
+    logger.info("Ensure eval policy actions/log-probs are available")
+    eval_actions, eval_log_prob = _ensure_eval_actions(dataset, eval_algo, logger)
+    logger.info("Eval policy actions/log-probs are available")
 
     # Handle Q-function computation
     if q_function_method == "fqe":

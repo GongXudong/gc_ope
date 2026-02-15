@@ -3,21 +3,22 @@ hydra:
     # 示例：自定义路径（包含日期、时间、应用名）
     dir: outputs/${env}_${algo}_${data_collection.num_episodes}_${importance_scoring.kernel_type}_${now:%Y%m%d_%H%M%S}
 
-env: my_push #my_reach my_push my_slide
-env_id:  MyPushSparse-v0 #MyReachSparse-v0 MyPushSparse-v0 MySlideSparse-v0
+env: my_reach #my_reach my_push my_slide flycraft
+env_id:  MyReachSparse-v0 #MyReachSparse-v0 MyPushSparse-v0 MySlideSparse-v0 FlyCraft-v0
 algo: her  #her sac
-# Behavior policy data collection settings
+### Behavior policy data collection settings
 data_collection:
   num_episodes: 10000  # Number of episodes to collect
   max_steps: 400  # Max length of each episode
   seed: 42  # Random seed for data collection
   save_root: data  # Path to save the collected data
-# Online evaluation settings
+### Online evaluation settings
 online_evaluation:
   num_episodes: 10000  # Number of episodes for online evaluation
   max_steps: 200  # Max length of each episode
   seed: 24  # Random seed for online evaluation
-# FQE (Fitted Q Evaluation) settings
-# Importance Scoring settings
+  process_num: 4  # Number of parallel processes for online evaluation
+### FQE (Fitted Q Evaluation) settings
+### Importance Scoring settings
 importance_scoring:
   kernel_type: all  # Type of kernel to use (e.g., gaussian, epanechnikov, triangular, cosine, uniform)

@@ -35,6 +35,7 @@ from gc_ope.algorithm.ope.estimators import (
     SelfNormalizedDR,
 )
 
+from gc_ope.algorithm.ope.evaluation.evaluate_on_bgoal import evaluate_agent
 
 @hydra.main(version_base=None, config_path=str("../../../configs/ope"), config_name="config")
 def test_ope(ope_cfg: DictConfig) -> None:
@@ -83,7 +84,7 @@ def test_ope(ope_cfg: DictConfig) -> None:
     # 根据checkpoint路径确定策略类型
     # 注意：HER 实际上是 SAC + HerReplayBuffer，所以使用 SAC.load() 来加载
     # HER 模型需要传递 env 参数，因为 HerReplayBuffer 需要环境来初始化
-    if "sac" in str(ckpt_path_1) or "her" in str(ckpt_path_1):
+    if "sac" in str(ckpt_path_1) or "her" in str(ckpt_path_1) or "omega" in str(ckpt_path_1):
         # 对于 HER 模型，需要传递 env 参数；对于普通 SAC，传递 env 也是安全的
         behavior_algo = SAC.load(ckpt_path_1, env=env)
         eval_algo = SAC.load(ckpt_path_2, env=env)
@@ -97,23 +98,10 @@ def test_ope(ope_cfg: DictConfig) -> None:
     logger.info(f"gamma= {gamma}")
 
 
-    # 在线评估真实回报（可选，耗时）
-    if ONLINE_EVAL:
-        for randam_seed in [42]:
-            mean_r_e, std_r_e = evaluate_policy(eval_algo, env, n_eval_episodes=ope_cfg.online_evaluation.num_episodes, deterministic=True)
-            logger.info(f"eval return:     {mean_r_e:.2f} ± {std_r_e:.2f}")
-            # # mean_r_b, std_r_b = evaluate_policy(behavior_algo, env, n_eval_episodes=5, deterministic=True)
-            # mean_r_e, std_r_e = evaluate_policy(eval_algo, env, n_eval_episodes=1000, deterministic=True, randam_seed=42)
-            # # logger.info(f"behavior return: {mean_r_b:.2f} ± {std_r_b:.2f}")
-            # logger.info(f"eval return:     {mean_r_e:.2f} ± {std_r_e:.2f}")
-            # '''
-            # eval return:     -87.16 ± 50.82 # 100 episodes
-            # eval return:     -81.70 ± 53.87 # 1000 episodes
-            # '''
-
-    #STEP2： 采样行为数据（已实现：数据采样和评价策略缓存分离）
+    
+    #STEP2：[重点耗时] 采样行为数据（已实现：数据采样和评价策略缓存分离）
     # 现在 collect_logged_dataset 只进行数据采样，评价策略缓存会在 build_ope_inputs 中自动计算
-    # TODO：做日志存档
+    # DONE：做日志存档
     n_episodes = ope_cfg.data_collection.num_episodes
     max_steps = ope_cfg.data_collection.max_steps
 
@@ -133,7 +121,21 @@ def test_ope(ope_cfg: DictConfig) -> None:
         with open(data_save_path, "rb") as f:    
             dataset = pickle.load(f)
         logger.info("Dataset loaded successfully")
-
+    
+    #STEP: 在行为策略的目标上进行在线评估
+    if ONLINE_EVAL:
+        online_mean, online_std = evaluate_agent(
+            eval_pi_ckpt_path=ckpt_path_2,
+            data_behavior=dataset,
+            behavior_pi_name=f"{ope_cfg.algo}_seed_1",
+            algo_type=ope_cfg.algo,
+            env_cfg=env_cfg.env,  # 传递环境配置，用于flycraft环境自动提取config_file和custom_config
+            process_num=ope_cfg.online_evaluation.process_num,
+            gamma=gamma,
+            seed=ope_cfg.online_evaluation.seed,
+            logger=logger,
+        )
+        
     #STEP3： 构造 OPE 输入（已实现：FQE 训练和预测集成到 build_ope_inputs）
     # FQE 训练和预测过程已集成，支持 q_function_method 参数（当前仅支持 "fqe"）
     # 可以通过 fqe_train_kwargs 自定义训练参数，通过 fqe_kwargs 自定义 FQE 初始化参数
@@ -147,6 +149,7 @@ def test_ope(ope_cfg: DictConfig) -> None:
         dataset=dataset,
         eval_algo=eval_algo,
         gamma=gamma,
+        logger=logger,
         # fqe=None,  # 如果为 None，会自动创建并训练
         # q_function_method="fqe",  # 默认 "fqe"
         fqe_train_kwargs={
@@ -172,39 +175,7 @@ def test_ope(ope_cfg: DictConfig) -> None:
             # "goal_dim": dataset.obs_dict[0]['desired_goal'].shape[0],
         },
     )
-    '''
-    Epoch 0001 | FQE loss=0.874
-    Epoch 0002 | FQE loss=0.869
-    Epoch 0003 | FQE loss=0.882
-    Epoch 0004 | FQE loss=0.945
-    Epoch 0005 | FQE loss=1.088
-    Epoch 0006 | FQE loss=1.336
-    Epoch 0007 | FQE loss=1.747
-    Epoch 0008 | FQE loss=2.365
-    Epoch 0009 | FQE loss=3.259
-    Epoch 0010 | FQE loss=4.380 DM (step-wise): EstimateResult(mean=-14.848934173583984
-    Epoch 0011 | FQE loss=5.747
-    Epoch 0012 | FQE loss=7.545
-    Epoch 0013 | FQE loss=9.698
-    Epoch 0014 | FQE loss=12.217
-    Epoch 0015 | FQE loss=16.638
-    Epoch 0016 | FQE loss=20.176
-    Epoch 0017 | FQE loss=23.389
-    Epoch 0018 | FQE loss=28.612
-    Epoch 0019 | FQE loss=37.594
-    Epoch 0020 | FQE loss=42.861 DM (step-wise): EstimateResult(mean=-55.72665023803711
-    Epoch 0021 | FQE loss=51.796
-    Epoch 0022 | FQE loss=59.927
-    Epoch 0023 | FQE loss=69.440
-    Epoch 0024 | FQE loss=86.010
-    Epoch 0025 | FQE loss=95.738
-    Epoch 0026 | FQE loss=106.316
-    Epoch 0027 | FQE loss=123.766
-    Epoch 0028 | FQE loss=138.375
-    Epoch 0029 | FQE loss=157.954
-    Epoch 0030 | FQE loss=188.884 DM (step-wise): EstimateResult(mean=-120.50849914550781
-    '''
-
+    
     #STEP4： 计算 OPE 估计值
     # 使用新的类API，支持kernel和self-normalize
     dm_estimator = DMEstimator(gamma=gamma)
@@ -231,6 +202,7 @@ def test_ope(ope_cfg: DictConfig) -> None:
         sn_pdis_res = sn_pdis.estimate(inputs, ci_method="bootstrap")
         sn_dr_res = sn_dr.estimate(inputs, ci_method="bootstrap")
 
+        logger.info(f"ONLINE (≈ground truth): {online_mean} ± {online_std}")
         logger.info(f"DM: {dm_res}")
         logger.info(f"TIS: {tis_kernel_res}")
         logger.info(f"PDIS: {pdis_kernel_res}")
