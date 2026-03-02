@@ -127,9 +127,12 @@ def rollout(
 
 @hydra.main(version_base=None, config_path="../../configs/evaluate", config_name="config")
 def evaluate_agent(cfg: DictConfig) -> None:
-    
+    import logging
+    logger = logging.getLogger(__name__)
+
     # 1.遍历每个ckpt和对应的RB
     folder = Path(PROJECT_ROOT_DIR / cfg.ckpt_dir)
+    logger.info(f"开始评估，ckpt文件夹: {folder}")
     
     # 1.1 检查路径是否存在且为文件夹
     if not folder.exists():
@@ -140,12 +143,16 @@ def evaluate_agent(cfg: DictConfig) -> None:
     # 1.2 遍历
     for ckpt_file in folder.glob("*.zip"):
         # ckpt
-        print(f"Begin to process: {str(ckpt_file)}")
+        # print(str(ckpt_file.stem))
+        if "best_model" in str(ckpt_file.stem):
+            logger.info(f"跳过文件（'best_model'）: {str(ckpt_file)}")
+            continue
+        logger.info(f"Begin to process: {str(ckpt_file)}")
         # DONE: 找这个ckpt对应的RB，用正则表达式找出ckpt_idx, 构造RB的文件名，rb_file
-        epoch_idx = ckpt_file.stem.split("_")[2]
+        ckpt_idx = ckpt_file.stem.split("_")[2]
         # 检测epoch_idx是否为整数
-        assert epoch_idx.isdigit(), f"提取的索引 '{epoch_idx}' 不是整数！请检查ckpt文件名格式，当前文件：{ckpt_file.name}"
-        rb_file = ckpt_file.parent / f"rl_model_replay_buffer_{epoch_idx}_steps.pkl"
+        assert ckpt_idx.isdigit(), f"提取的索引 '{ckpt_idx}' 不是整数！请检查ckpt文件名格式，当前文件：{ckpt_file.name}"
+        rb_file = ckpt_file.parent / f"rl_model_replay_buffer_{ckpt_idx}_steps.pkl"
         if not rb_file.exists():
             raise FileNotFoundError(f"文件不存在: {rb_file}")
 
@@ -170,12 +177,11 @@ def evaluate_agent(cfg: DictConfig) -> None:
             })
             # 3. 随机取1000条数据
             if len(evaluation_goals) <= 1000:
-                print(f"\n⚠️  数据量不足1000条（仅{len(evaluation_goals)}条），已取全部数据")
+                logger.info(f"\n⚠️  数据量不足1000条（仅{len(evaluation_goals)}条），已取全部数据")
             else:
                 evaluation_goals = evaluation_goals.sample(n=1000, random_state=42).reset_index(drop=True)
             
-            print(evaluation_goals.head())
-            input()
+            logger.info(f"评估目标数量: {len(evaluation_goals)}")
 
         except pickle.UnpicklingError as e:
             # 处理pickle加载错误（比如文件损坏、格式不兼容）
@@ -216,7 +222,10 @@ def evaluate_agent(cfg: DictConfig) -> None:
 
             csv_res_name = ckpt_file.parent / f"{ckpt_file.stem}_{cfg.eval_res_csv_file_suffix}.csv"
             res_df.to_csv(csv_res_name, index=False)
-            print(f"Finish processing {str(ckpt_file)}, save res to {csv_res_name}")
+            term_dict = res_df['termination'].value_counts().to_dict()
+            reach_count = term_dict.get("reach target", 0)
+            reach_ratio = reach_count / len(res_df)
+            logger.info(f"Finish. reach_ratio: {reach_ratio}, ckpt_idx: {ckpt_idx}, save res to {csv_res_name}")
 
     exit()
 
