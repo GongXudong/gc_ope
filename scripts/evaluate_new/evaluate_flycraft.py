@@ -216,6 +216,10 @@ def evaluate_agent(cfg: DictConfig) -> None:
                 "mu": achieved_original[:, 1],
                 "chi": achieved_original[:, 2],
             })
+            # 确保v列为数值类型（避免字符串"0"被误判）
+            evaluation_goals["v"] = pd.to_numeric(evaluation_goals["v"], errors="coerce")
+            # 剔除v=0的行
+            evaluation_goals = evaluation_goals[evaluation_goals["v"] != 0].reset_index(drop=True)
             # 3. 随机取1000条数据
             if len(evaluation_goals) <= 1000:
                 logger.info(f"\n⚠️  数据量不足1000条（仅{len(evaluation_goals)}条），已取全部数据")
