@@ -175,6 +175,26 @@ def evaluate_agent(cfg: DictConfig) -> None:
                 "y": achieved_goals[:, 1],
                 "z": achieved_goals[:, 2],
             })
+
+            # 统计信息：每轴的描述性统计以及重复情况（总数、唯一数、重复数），并记录top重复项与每轴前10个值分布
+            axis_desc = evaluation_goals.describe().transpose()
+            logger.info(f"evaluation_goals per-axis stats:\n{axis_desc.to_string()}")
+
+            total_goals = len(evaluation_goals)
+            unique_goals = evaluation_goals.drop_duplicates().shape[0]
+            duplicate_count = total_goals - unique_goals
+            logger.info(f"Total goals: {total_goals}, Unique goals: {unique_goals}, Duplicates: {duplicate_count}")
+
+            if duplicate_count > 0:
+                dup_counts = evaluation_goals.groupby(['x','y','z']).size().sort_values(ascending=False).head(20)
+                logger.info(f"Top duplicate goal counts:\n{dup_counts.to_string()}")
+
+            # 每轴的值分布（前10）
+            logger.info(
+                f"Top values per axis:\nX:\n{evaluation_goals['x'].value_counts().head(10).to_string()}\n"
+                f"Y:\n{evaluation_goals['y'].value_counts().head(10).to_string()}\n"
+                f"Z:\n{evaluation_goals['z'].value_counts().head(10).to_string()}"
+            )
             # 3. 随机取1000条数据
             if len(evaluation_goals) <= 1000:
                 logger.info(f"\n⚠️  数据量不足1000条（仅{len(evaluation_goals)}条），已取全部数据")

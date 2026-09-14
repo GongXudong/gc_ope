@@ -18,6 +18,7 @@ def test_get_myslide_vec_env():
 
     # check env
     obs = train_env.reset()
+    print(obs)
 
     for i in range(10):
         actions = [train_env.action_space.sample() for _ in range(train_env.num_envs)]
