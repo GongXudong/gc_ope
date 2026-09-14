@@ -19,3 +19,8 @@ plots/
 f16trace.csv
 dev_logs/exp_logs.md
 *.txt
+
+# Local untracked research materials and generated artifacts
+nohup.out
+paper/
+初读理解.pdf
