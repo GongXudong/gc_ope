@@ -1,7 +1,7 @@
 """Offline KDE/GMM prediction check on vanilla SAC evaluation CSVs.
 
 Example:
-  uv run python scripts/evaluate_gmm_prediction.py --env push --seed 1 \
+  conda run -n gc_ope python scripts/evaluate_gmm_prediction.py --env push --seed 1 \
       --checkpoint 100000 --output-dir logs/gmm_prediction
 """
 
@@ -22,7 +22,10 @@ from gc_ope.evaluate.evaluator_kde import KDEEvaluator
 
 ROOT = Path(__file__).resolve().parents[1]
 CHECKPOINT_RE = re.compile(r"rl_model_(\d+)_steps_eval_res_on_fixed\.csv$")
-GOAL_COLUMNS = ["x", "y", "z"]
+# Push/Slide keep z fixed.  Comparing densities in the effective x-y goal
+# space avoids treating that deterministic coordinate as a continuous random
+# variable with an arbitrary GMM regularization width.
+GOAL_COLUMNS = ["x", "y"]
 
 
 def checkpoint_file(env: str, seed: int, timestep: int) -> Path:
@@ -42,10 +45,17 @@ def historical_files(env: str, seed: int, checkpoint: int) -> list[tuple[int, Pa
     return sorted(found)
 
 
-def add_records(evaluator, frames: list[tuple[int, pd.DataFrame]], checkpoint: int, kappa: float):
+def add_records(
+    evaluator,
+    frames: list[tuple[int, pd.DataFrame]],
+    checkpoint: int,
+    kappa: float,
+    goal_columns: list[str] | None = None,
+):
+    columns = GOAL_COLUMNS if goal_columns is None else list(goal_columns)
     goals, successes, weights = [], [], []
     for timestep, frame in frames:
-        goals.append(frame[GOAL_COLUMNS].to_numpy(dtype=float))
+        goals.append(frame[columns].to_numpy(dtype=float))
         successes.extend((frame["termination"].to_numpy() == "reach target").tolist())
         weights.extend([float(kappa ** ((checkpoint - timestep) / 10000.0))] * len(frame))
     if not goals:
@@ -65,7 +75,11 @@ def add_records(evaluator, frames: list[tuple[int, pd.DataFrame]], checkpoint: i
 
 
 def discrete_kl(reference_goals: np.ndarray, grid: np.ndarray, predicted_density: np.ndarray) -> float:
-    """KL(q||p) on the fixed evaluation grid, q from reference successes."""
+    """KL(q||p) on the fixed evaluation grid, q from reference successes.
+
+    注意：这是离散格点近似，不是连续 KL。两个估计器在同一格点集上可比，
+    但绝对值会偏大，只作为辅助诊断。
+    """
     if len(reference_goals) == 0:
         return float("nan")
     # Fixed CSVs share the same goal ordering; matching by rows also tolerates
@@ -95,6 +109,7 @@ def run(args: argparse.Namespace) -> dict:
         n_components=args.n_components,
         resample_size=args.resample_size,
         random_state=args.random_state,
+        reg_covar=args.gmm_reg_covar,
     )
     hist_goals, hist_success, hist_weights = add_records(gmm, history, args.checkpoint, args.kappa)
     # Feed exactly the same records into KDE.
@@ -111,6 +126,7 @@ def run(args: argparse.Namespace) -> dict:
         "seed": args.seed,
         "checkpoint": args.checkpoint,
         "reference_file": str(ref_path),
+        "goal_columns": GOAL_COLUMNS,
         "historical_files": len(history),
         "historical_rows": int(len(hist_goals)),
         "historical_successes": int(hist_success.sum()),
@@ -119,6 +135,8 @@ def run(args: argparse.Namespace) -> dict:
         "reference_successes": int(len(ref_success)),
         "reference_success_rate": float(len(ref_success) / len(reference)),
         "gmm_components": int(gmm.gmm.n_components),
+        "gmm_reg_covar": float(args.gmm_reg_covar),
+        "gmm_fit_diagnostics": gmm.fit_diagnostics_,
         "gmm_converged": bool(gmm.gmm.converged_),
         "gmm_kl_reference_to_prediction": discrete_kl(ref_success, grid, gmm_density),
         "kde_kl_reference_to_prediction": discrete_kl(ref_success, grid, kde_density),
@@ -131,10 +149,12 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--checkpoint", type=int, required=True)
     parser.add_argument("--kappa", type=float, default=0.9)
-    parser.add_argument("--n-components", type=int, default=2)
+    parser.add_argument("--n-components", type=int, default=5)
     parser.add_argument("--resample-size", type=int, default=1000)
-    parser.add_argument("--kde-bandwidth", type=float, default=1.0)
+    # Keep the baseline identical to the paper/configured PE-GCRL KDE.
+    parser.add_argument("--kde-bandwidth", type=float, default=0.2)
     parser.add_argument("--random-state", type=int, default=0)
+    parser.add_argument("--gmm-reg-covar", type=float, default=1e-6)
     parser.add_argument("--reference-eval-file")
     parser.add_argument("--output-dir", default="logs/gmm_prediction")
     args = parser.parse_args()
@@ -149,4 +169,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
