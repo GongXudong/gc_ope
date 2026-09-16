@@ -62,6 +62,7 @@ METRIC_COLUMNS = [
     "historical_successes", "reference_successes",
     "status", "error", "job_time_s",
 ]
+ORACLE_MAX_REFERENCES = 200000
 
 
 def _checkpoint_dir(task: str, seed: int) -> Path:
@@ -237,12 +238,17 @@ def _run_one_job(
             base_row["job_time_s"] = round(time.time() - t0, 2)
             return base_row
 
+        # oracle KDE 的参考成功目标超过 200k 时，MC-KL 计算代价过高（小时级），
+        # 按计划降级策略降采样到 200k，保持实验可完成性。
+        ref_used = success
+        if len(ref_used) > ORACLE_MAX_REFERENCES:
+            ref_used = ref_used[:ORACLE_MAX_REFERENCES]
         oracle = KDEEvaluator(
             evaluation_result_container_class=EvaluationResultContainer,
             kde_bandwidth=bandwidth,
         )
         oracle.eval_res_container.add_batch(
-            success, [True] * len(success), [0.0] * len(success), [0.0] * len(success),
+            ref_used, [True] * len(ref_used), [0.0] * len(ref_used), [0.0] * len(ref_used),
         )
         oracle.fit_evaluator()
 

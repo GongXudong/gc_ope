@@ -3,7 +3,9 @@
 > **当前状态：** 进行中  
 > **优先级：** 高  
 > **截止时间：** 约 3 天后  
-> **主要目的：** 完成审稿人要求的 distribution estimation replacement / robustness experiment
+> **主要目的：** 完成审稿人要求的 distribution estimation replacement / robustness experiment  
+>
+> **范围调整（2026-09-16）：** 时间不足，**核心范围收窄为 push/slide 两个 2D 场景**（各 5 seed × 5 checkpoint，4 传统估计器 + NN/Flow Matching 全量完成，300 行零 error）。reach/vvc 部分完成（4 传统估计器中 reach/vvc 的 KDE 各缺 9/12 个 (seed,ckpt)，原因是这些 checkpoint 历史成功目标 >17 万，sklearn KDE 在 3D 上 fit 达 4 分钟/job、MC-KL 小时级；NN/FM 在 reach/vvc 已全量完成）。reach/vvc 的 KDE 缺失部分**留待后续补跑**，不影响 push/slide 的最终结论与交付。
 
 ---
 
@@ -747,17 +749,21 @@ data split
 
 - [x] Weighted Histogram / Grid Density（`src/gc_ope/evaluate/evaluator_replacements.py`）
 - [x] Multivariate Gaussian（`src/gc_ope/evaluate/evaluator_replacements.py`）
-- [x] 在相关任务上运行 replacement experiments（push/slide/reach/vvc，`logs/replacement_experiment/`）
-- [ ] 完成 downstream evaluation
-- [ ] 汇总不同 estimator 的结果
-- [ ] 检查实验 reproducibility
+- [x] 在相关任务上运行 replacement experiments（push/slide 全量完成；reach/vvc 的 KDE 因大数据量留待补跑，`logs/replacement_experiment/`）
+- [x] 汇总不同 estimator 的结果（push/slide 6 估计器统一 comparison table + KL 曲线图，`logs/replacement_experiment/plots/`）
+- [ ] 完成 downstream evaluation（待接课程学习 pipeline，等 6 方法离线验证通过）
+- [ ] 检查实验 reproducibility（单 job 确定性已验证，全量复跑留待后续）
 
 ## P0.5：加权 NN / Flow Matching
 
 - [x] 加权 MLP 密度估计器（`src/gc_ope/evaluate/evaluator_learned.py`，dim→16→16→1，loss=Σw_i·(f_θ−y_i)²，y_i=LOO-KDE log-density）
 - [x] Flow Matching 密度估计器（`src/gc_ope/evaluate/evaluator_learned.py`，直线 flow + 2 层 MLP 向量场，权重注入=按权重采样条件目标，密度=forward 采样+KDE）
 - [x] 单测：确定性（同 seed 重训一致）、密度非负有限、KDE baseline 不受影响（`tests/evaluate/test_evaluator_learned.py`，7 个全过）
-- [ ] 全量 job：4 task × 2 method × 5 seed × 5 checkpoint（排在 P0 四方法全量跑完之后启动）
+- [x] 全量 job：4 task × 2 method × 5 seed × 5 checkpoint（push/slide/reach/vvc 均完成，NN/FM 无缺失）
+
+## P0.5 补跑待办（时间不足留待后续）
+
+- [ ] reach/vvc 的 4 传统估计器中 KDE 各缺 9/12 个 (seed,ckpt)，原因：这些 checkpoint 历史成功目标 >17 万，sklearn KDE 在 3D 上 fit 4 分钟/job + MC-KL 小时级；已加 oracle 截断 200k（`ORACLE_MAX_REFERENCES`），补跑脚本就绪（`scripts/replacement_run_parallel.py --methods kde --tasks reach vvc`），待 32 核空闲时启动
 
 ## P1：强烈建议
 
@@ -770,8 +776,8 @@ data split
 
 ## 最终分析
 
-- [ ] 比较所有核心 estimator
-- [ ] 生成实验结果表
+- [x] 比较所有核心 estimator（push/slide 6 估计器 KL 均值/标准差 + 随训练步数曲线，`logs/replacement_experiment/plots/summary_table.csv` + `fig_kl_curves.png`）
+- [ ] 生成实验结果表（push/slide 已完成；reach/vvc 待补跑后合并）
 - [ ] 生成必要的 distribution visualization
 - [ ] 检查不同方法是否得到一致趋势
 - [ ] 检查 downstream result 是否保持
