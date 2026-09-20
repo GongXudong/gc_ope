@@ -207,7 +207,10 @@ def monte_carlo_kl(
     mask = np.isfinite(diff)
     if not mask.all():
         dropped = int((~mask).sum())
-        print(f"    MC-KL dropped {dropped}/{n_samples} out-of-support samples", flush=True)
+        try:
+            print(f"    MC-KL dropped {dropped}/{n_samples} out-of-support samples", flush=True)
+        except BrokenPipeError:
+            pass
     if mask.sum() < 10:
         return float("nan")
     return float(np.mean(diff[mask]))

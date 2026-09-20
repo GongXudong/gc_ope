@@ -77,6 +77,30 @@ class KDEEvaluator(EvaluatorBase):
         else:
             return scaled_desired_goals, log_densities
 
+    def evaluate_grid(self, grid: np.ndarray, return_log_density: bool = False) -> np.ndarray:
+        """在 raw 目标坐标上评估 KDE 密度，并做 StandardScaler Jacobian 校正。
+
+        ``evaluate()`` 的默认返回值是在标准化坐标中的密度；本方法与
+        GMM/Normalizing Flow 的 ``evaluate_grid()`` 保持同一接口，专门供
+        fixed-grid KL 和密度图使用。
+        """
+        grid = np.asarray(grid, dtype=float)
+        if grid.ndim != 2:
+            raise ValueError("grid 必须是二维数组")
+        if not hasattr(self, "scaler") or not hasattr(self, "kde"):
+            raise RuntimeError("KDEEvaluator.evaluate_grid() 需要先调用 fit_evaluator()")
+        try:
+            scale = np.asarray(self.scaler.scale_, dtype=float)
+        except AttributeError as exc:
+            raise RuntimeError("KDEEvaluator.evaluate_grid() 需要先调用 fit_evaluator()") from exc
+        if np.any(~np.isfinite(scale)) or np.any(scale <= 0):
+            raise ValueError("拟合的 scaler 存在非正或非有限的 scale，无法转换到原始坐标密度")
+        log_density = self.kde.score_samples(self.scaler.transform(grid))
+        log_density = log_density - np.log(scale).sum()
+        if return_log_density:
+            return log_density
+        return np.exp(np.clip(log_density, -745.0, 709.0))
+
     def kl_divergence_uniform_to_kde_mc(
         self,
         sample_uniform_func: Callable[[], Union[list, np.ndarray]],

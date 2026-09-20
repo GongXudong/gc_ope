@@ -39,3 +39,10 @@
 - 代码注释、文档、print 用中文，标识符用英文。
 - 新增 evaluator 参考 `evaluator_gmm.py`（最近的提交加了 weighted-resampled GMM）；新增 shell 参考对应场景 `shells/` 下的已有格式，逐 seed 列出完整命令。
 - `.gitignore` 已忽略 `checkpoints/`、`outputs/`、`logs/`、`plots/`、`nohup.out`、`paper/`、`初读理解.pdf` —— 这些是本地实验产物，不要提交。
+
+## 环境线程约束
+
+- 32 核 i9-14900K / 32 GB 内存。numpy/sklearn 用 OpenBLAS，默认 DYNAMIC_ARCH MAX_THREADS=64。
+- `replacement_run_all100.py` 是 ThreadPoolExecutor（GIL 只限制 Python 层；numpy BLAS 内核在 C 层多线程，4 个 worker 可各用 ~8 线程，总占用 32 线程匹配 32 核）。
+- 不建议用 ProcessPool 做大规模并行（每个进程独立加载 numpy/sklearn + BLAS，内存会 ×worker 数，且 BLAS 线程竞争会导致 128 线程争 32 核）。
+- 运行大规模 sweep 前确认机器无其他 CPU 密集任务。

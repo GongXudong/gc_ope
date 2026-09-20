@@ -23,6 +23,7 @@ dependencies = [
     "stable-baselines3>=2.7.0",
     "tensorboard>=2.20.0",
     "torch>=2.9.0",
+    "zuko>=1.6.0,<2.0.0",
     "tqdm>=4.67.1",
 ]
 

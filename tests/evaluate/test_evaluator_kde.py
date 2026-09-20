@@ -105,3 +105,23 @@ if __name__ == "__main__":
         [[10.0, 20.0], [30.0, 40.0]],
         [[1.0, 1.0], [1.0, 1.0]],
     )
+
+
+def test_kde_evaluate_grid_returns_raw_space_density():
+    """evaluate_grid 与 evaluate 的差别仅为 raw-space Jacobian 校正。"""
+    evaluator = KDEEvaluator(
+        evaluation_result_container_class=WeightedEvaluationResultContainer,
+        evaluation_result_container_kwargs={"discounted_factor": 0.9},
+        kde_bandwidth=0.2,
+    )
+    goals = np.array([[0.0, 0.0], [0.1, 0.0], [0.0, 0.1], [0.1, 0.1]])
+    evaluator.eval_res_container.add_batch(
+        goals.tolist(), [True] * len(goals), [0.0] * len(goals), [0.0] * len(goals), [1.0] * len(goals)
+    )
+    evaluator.fit_evaluator()
+    grid = np.array([[0.0, 0.0], [0.05, 0.05]])
+    _, scaled_density = evaluator.evaluate(grid, scale=True, return_density=True)
+    raw_density = evaluator.evaluate_grid(grid)
+    jacobian = float(np.prod(evaluator.scaler.scale_))
+    assert np.allclose(raw_density * jacobian, scaled_density)
+    assert np.all(np.isfinite(raw_density)) and np.all(raw_density > 0)
