@@ -22,7 +22,7 @@ class ExperimentConfig:
     mc_seed: int = 0
     kl_mode: str = "raw"
     parameters: dict = field(default_factory=lambda: {key: dict(value) for key, value in DEFAULT_PARAMETERS.items()})
-    protocol: str = "push_same_family_inclusive_v1"
+    protocol: str = "push_same_family_nn_logloss_v2"
 
     def __post_init__(self):
         if not 0 < self.kappa <= 1 or not np.isfinite(self.kappa):
@@ -57,6 +57,7 @@ def run_checkpoint(config, method, seed, checkpoint):
                kl=None, kl_seed_std=None, historical_successes=0, reference_successes=0,
                historical_records=0, reference_records=0, status="error", error="",
                protocol=config.protocol, kl_mode=config.kl_mode)
+    row.update(fit_quality="not_checked", fit_warnings="")
     detail = {}
     try:
         history, reference = load_pair(
@@ -67,6 +68,13 @@ def run_checkpoint(config, method, seed, checkpoint):
                    reference_successes=int(reference.successes.sum()),
                    historical_records=len(history.goals), reference_records=len(reference.goals))
         estimate_model, reference_model = fit_pair(method, history, reference, config)
+        # 计算成功与拟合质量分开记录：不删除质量差的点来美化曲线。
+        warnings = [f"{side}侧：{message}" for side, model in
+                    [("历史", estimate_model), ("参考", reference_model)]
+                    for message in getattr(model, "fit_diagnostics_", {}).get("quality_warnings", [])]
+        if method == "nn" and estimate_model.early_stopping:
+            row["fit_quality"] = "warning" if warnings else "passed_checks"
+        row["fit_warnings"] = "；".join(warnings)
         metric = monte_carlo_kl(reference_model, estimate_model, config.mc_samples,
                                 config.mc_repeats, config.mc_seed, config.kl_mode)
         row.update(kl=metric["kl"], kl_seed_std=metric["kl_seed_std"], status="ok")

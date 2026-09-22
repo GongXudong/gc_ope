@@ -9,7 +9,7 @@ from gc_ope.evaluate.evaluator_common import InsufficientSamples
 DEFAULT_PARAMETERS = {
     "kde": {"kde_bandwidth": 0.2},
     "gmm": {"n_components": 5, "resample_size": 1000, "random_state": 0},
-    "nn": {"hidden_width": 16, "n_epochs": 100, "bandwidth": 0.2, "random_state": 0},
+    "nn": {"hidden_layer_sizes": [16, 16], "n_epochs": 500, "bandwidth": 0.2, "random_state": 0},
     "nf": {"n_epochs": 100, "hidden_features": 32, "random_state": 0},
     "fm": {"n_epochs": 500, "hidden_features": 32, "samples_per_epoch": 2000, "random_state": 0},
 }
@@ -28,6 +28,8 @@ def make_evaluator(method, *, kappa=0.9, support_goals=None, parameters=None):
         raise ValueError(f"未知估计方法：{method}")
     kwargs = {**DEFAULT_PARAMETERS[method], **(parameters or {})}
     if method == "nn":
+        if "hidden_width" in (parameters or {}) and "hidden_layer_sizes" not in parameters:
+            kwargs.pop("hidden_layer_sizes")
         kwargs["support_goals"] = support_goals
     return classes[method](
         evaluation_result_container_class=WeightedEvaluationResultContainer,

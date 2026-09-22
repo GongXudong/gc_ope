@@ -84,4 +84,5 @@ def audit_result(path, expected):
     invalid = [step for step, row in rows.items() if not completed(row)]
     return {"missing": missing, "extra": extra, "invalid": invalid,
             "ok": sum(row["status"] == "ok" for row in rows.values()),
+            "fit_warnings": sum(row.get("fit_quality") == "warning" for row in rows.values()),
             "skipped": sum(str(row["status"]).startswith("skipped:") for row in rows.values())}

@@ -83,6 +83,15 @@ def test_missing_input_fails_before_creating_output(tmp_path):
     assert not (tmp_path / "result").exists()
 
 
+def test_nn_only_preserves_5_by_4_parallelism(tmp_path):
+    args = arguments(tmp_path)
+    result = subprocess.run([*args, "--methods", "nn", "--dry-run"], capture_output=True, text=True, timeout=20)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.count("--methods nn") == 5
+    assert result.stdout.count("--workers 4") == 5
+    assert "--methods fm" not in result.stdout
+
+
 def test_signal_cleans_seed_processes_and_workers(tmp_path):
     args = arguments(tmp_path, slow=True)
     with (tmp_path / "launch.log").open("w") as log:

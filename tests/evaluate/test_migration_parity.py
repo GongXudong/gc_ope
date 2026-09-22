@@ -32,11 +32,15 @@ def test_preserved_fitting_algorithm(method, class_name):
     weights = np.linspace(.3, 1, 100)
     axis = np.linspace(-3, 3, 12)
     support = np.array(np.meshgrid(axis, axis)).reshape(2, -1).T
-    current = make_evaluator(method, support_goals=support)
+    if method == "nn":
+        # 新早停是有意修正；这里只核对关闭早停后的原分类器算法。
+        parameters = {"hidden_width": 16, "n_epochs": 100, "early_stopping": False,
+                      "random_state": 0, "bandwidth": .2}
+    current = make_evaluator(method, support_goals=support, parameters=parameters)
     EvaluationBatch(goals, labels, weights).fill(current)
     current.fit_evaluator()
     if method == "nn":
-        # NN 的分类器保持不变；连续密度定义是已授权的改动，不要求伪等价。
+        # NN 关闭早停后的分类器保持不变；连续密度定义是已授权的改动，不要求伪等价。
         parameters.pop("bandwidth")
         old = cls(**parameters).fit_classifier(goals, labels, weights, support)
         np.testing.assert_allclose(current.predict_success_probability(support),

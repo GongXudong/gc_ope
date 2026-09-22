@@ -92,6 +92,8 @@ def main():
                         for row in pool.imap_unordered(run_job, jobs, chunksize=1):
                             save_row(output / f"{method}_push_seed{row['seed']}.csv", row)
                             report(f"{method} seed={row['seed']} step={row['checkpoint']} {row['status']} KL={row['kl']}")
+                            if row.get("fit_warnings"):
+                                report(f"拟合质量提醒：{row['fit_warnings']}")
             except KeyboardInterrupt:
                 report("收到中断：工作进程已清理，已落盘结果可续跑")
                 return 130

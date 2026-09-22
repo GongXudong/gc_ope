@@ -84,5 +84,18 @@ def test_reference_shortage_is_skipped_not_replaced_with_kde(tmp_path):
     assert row["status"] == "skipped:insufficient_samples"
 
 
+def test_nn_quality_warning_preserves_metric_and_is_audited(tmp_path):
+    write_checkpoint(tmp_path, 10000)
+    config = ExperimentConfig(str(tmp_path), parameters={"nn": {"n_epochs": 1}}, mc_samples=16, mc_repeats=1)
+    row, detail = run_checkpoint(config, "nn", 1, 10000)
+    assert row["status"] == "ok", row["error"]
+    assert row["fit_quality"] == "warning"
+    assert "训练上限" in row["fit_warnings"]
+    assert detail["reference_fit"]["stop_reason"] == "max_epochs"
+    path = tmp_path / "nn.csv"
+    save_row(path, row)
+    assert audit_result(path, [10000])["fit_warnings"] == 1
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-q"]))
