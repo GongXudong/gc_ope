@@ -1,6 +1,7 @@
 """新 NN 单独重跑后的绘图来源检查；合成数据只写到 pytest 临时目录。"""
 
 import importlib.util
+import json
 from pathlib import Path
 import pandas as pd
 import pytest
@@ -67,3 +68,30 @@ def test_weighted_em_adds_sixth_method_without_replacing_gmm(sources, tmp_path):
     assert len(data) == 60 and data.method.nunique() == 6
     assert (data.loc[data.method == "GMM", "kl"] == .5).all()
     assert (data.loc[data.method == "GMM (weighted EM)", "kl"] == .03).all()
+
+
+def test_regularized_em_keeps_original_and_checks_configuration(sources, tmp_path):
+    plot, old, new, legacy = sources
+    roots = [tmp_path / "em", tmp_path / "reg"]
+    for root, reg, kl in zip(roots, [1e-6, .05], [.03, .01]):
+        (root / "method_per_seed").mkdir(parents=True)
+        (root / "experiment.json").write_text(json.dumps({"mc_samples": 10000,
+            "parameters": {"gmm_em": {"reg_covar": reg, "n_components": 5}}}))
+        for seed in range(1, 6):
+            frame = pd.read_csv(old / "method_per_seed" / f"gmm_push_seed{seed}.csv")
+            frame["method"], frame["protocol"], frame["kl"] = "gmm_em", "push_same_family_gmm_em_v1", kl
+            frame.to_csv(root / "method_per_seed" / f"gmm_em_push_seed{seed}.csv", index=False)
+    data, audit, hashes = plot.load_data(old, legacy, new, *roots)
+    assert data.method.nunique() == 7 and len(data) == 70
+    assert (data.loc[data.method == "GMM (weighted EM)", "kl"] == .03).all()
+    assert (data.loc[data.method == plot.REGULARIZED_EM, "kl"] == .01).all()
+    assert audit["gmm_em_seed1"]["ok"] == audit["gmm_em_reg005_seed1"]["ok"] == 2
+    assert len(hashes) == 37  # 35 份 CSV，加上两份变体配置。
+    with pytest.raises(ValueError, match="图例不符"):
+        plot.load_data(old, legacy, new, roots[0], roots[0])
+    path = roots[1] / "experiment.json"
+    config = json.loads(path.read_text())
+    config["mc_samples"] = 10
+    path.write_text(json.dumps(config))
+    with pytest.raises(ValueError, match="还有差异"):
+        plot.load_data(old, legacy, new, *roots)
