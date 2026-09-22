@@ -1,0 +1,23 @@
+{
+  "gmm": {
+    "baseline": {},
+    "reg_0p01": {"reg_covar": 0.01},
+    "reg_0p05": {"reg_covar": 0.05},
+    "reg_0p2": {"reg_covar": 0.2}
+  },
+  "gmm_em": {
+    "baseline": {},
+    "reg_0p01": {"reg_covar": 0.01},
+    "reg_0p05": {"reg_covar": 0.05},
+    "reg_0p2": {"reg_covar": 0.2}
+  },
+  "nf": {
+    "baseline": {},
+    "updates_300": {"n_epochs": 300},
+    "updates_500": {"n_epochs": 500}
+  },
+  "fm": {
+    "baseline": {},
+    "updates_1000": {"n_epochs": 1000}
+  }
+}
