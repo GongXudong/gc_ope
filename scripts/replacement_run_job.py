@@ -197,13 +197,44 @@ def _historical_arrays(
     )
 
 
+def _load_sampled_history(
+    task: str, seed: int, checkpoint: int, samples_per_checkpoint: int = 0,
+    sampling_seed: int = 0, include_current: bool = False,
+) -> list[tuple[int, pd.DataFrame]]:
+    """先从每份完整记录有放回抽样，再由估计器处理成功/失败标签。
+
+    随机流只依赖任务、训练 seed、来源 checkpoint 和抽样种子；与估计方法、
+    当前查询 checkpoint 及并行调度顺序无关，等价于每份历史文件只抽一次后累积。
+    0 表示保留原有全量历史模式。旧投稿的抽样未固定种子，无法还原其具体行。
+    """
+    if samples_per_checkpoint < 0 or sampling_seed < 0:
+        raise ValueError("历史抽样数量和随机种子不能为负")
+    files = _historical_files(task, seed, checkpoint)
+    if include_current:
+        files = [*files, (checkpoint, _checkpoint_csv(task, seed, checkpoint))]
+    frames = []
+    task_code = {"push": 1, "slide": 2, "reach": 3, "vvc": 4}[task]
+    for step, path in files:
+        frame = pd.read_csv(path)
+        if samples_per_checkpoint:
+            if frame.empty:
+                raise ValueError(f"历史文件为空，无法抽样: {path}")
+            rng = np.random.default_rng(np.random.SeedSequence([sampling_seed, task_code, seed, step]))
+            indices = rng.integers(0, len(frame), size=samples_per_checkpoint)
+            frame = frame.iloc[indices].copy()
+        frames.append((step, frame))
+    return frames
+
+
 def _make_estimator(method: str, task: str, *, kappa: float, n_components: int,
                     resample_size: int, bandwidth: float, random_state: int,
                     gmm_reg_covar: float, n_hist_bins: int, gaussian_reg_covar: float,
                     nn_epochs: int = 100, nn_lr: float = 1e-3, nn_hidden: int = 16,
                     nn_early_stopping: bool = True, nn_validation_fraction: float = 0.1,
                     nn_n_iter_no_change: int = 10,
-                    fm_epochs: int = 80, fm_hidden: int = 16, fm_samples: int = 2000,
+                    fm_epochs: int = 100, fm_hidden: int = 32, fm_samples: int = 2000,
+                    fm_lr: float = 1e-3, fm_ode_steps: int = 32, fm_weight_decay: float = 0.0,
+                    fm_likelihood_batch_size: int = 1024,
                     nf_epochs: int = 100, nf_lr: float = 1e-3, nf_hidden: int = 32,
                     nf_transforms: int = 4, nf_bins: int = 8, nf_weight_decay: float = 0.0):
     container_kwargs = {"discounted_factor": kappa}
@@ -234,7 +265,20 @@ def _make_estimator(method: str, task: str, *, kappa: float, n_components: int,
             n_iter_no_change=nn_n_iter_no_change,
         )
     if method == "flow_matching":
-        raise ValueError("flow_matching 已移除旧实现，等待按新协议重新实现")
+        from gc_ope.evaluate.evaluator_fm import FlowMatchingDensityEvaluator
+        return FlowMatchingDensityEvaluator(
+            evaluation_result_container_class=WeightedEvaluationResultContainer,
+            evaluation_result_container_kwargs=container_kwargs,
+            n_epochs=fm_epochs,
+            lr=fm_lr,
+            hidden_features=fm_hidden,
+            samples_per_epoch=fm_samples,
+            ode_steps=fm_ode_steps,
+            weight_decay=fm_weight_decay,
+            likelihood_batch_size=fm_likelihood_batch_size,
+            random_state=random_state,
+            device="cpu",
+        )
     if method == "normalizing_flow":
         from gc_ope.evaluate.evaluator_nf import NormalizingFlowDensityEvaluator
         return NormalizingFlowDensityEvaluator(
@@ -272,9 +316,13 @@ def _run_one_job(
     nn_early_stopping: bool = True,
     nn_validation_fraction: float = 0.1,
     nn_n_iter_no_change: int = 10,
-    fm_epochs: int = 80,
-    fm_hidden: int = 16,
+    fm_epochs: int = 100,
+    fm_hidden: int = 32,
     fm_samples: int = 2000,
+    fm_lr: float = 1e-3,
+    fm_ode_steps: int = 32,
+    fm_weight_decay: float = 0.0,
+    fm_likelihood_batch_size: int = 1024,
     nf_epochs: int = 100,
     nf_lr: float = 1e-3,
     nf_hidden: int = 32,
@@ -283,6 +331,9 @@ def _run_one_job(
     nf_weight_decay: float = 0.0,
     mc_samples: int = 100000,
     mc_repeats: int,
+    history_samples_per_checkpoint: int = 0,
+    history_sampling_seed: int = 0,
+    history_include_current: bool = False,
     n_sampled_goals: int = 0,
     candidate_goals: int = 100,
     sampling_method: str = "mega",
@@ -291,7 +342,10 @@ def _run_one_job(
     t0 = time.time()
     goal_columns = TASK_GOAL_COLUMNS[task]
     reference = pd.read_csv(_checkpoint_csv(task, seed, checkpoint))
-    history = [(t, pd.read_csv(p)) for t, p in _historical_files(task, seed, checkpoint)]
+    history = _load_sampled_history(
+        task, seed, checkpoint, history_samples_per_checkpoint,
+        history_sampling_seed, history_include_current,
+    )
     historical_successes = int(sum((f["termination"] == "reach target").sum() for _, f in history))
     reference_successes = int((reference["termination"] == "reach target").sum())
 
@@ -310,12 +364,34 @@ def _run_one_job(
         "job_time_s": round(time.time() - t0, 2),
         # 供通用单轨迹调度器取出；不会写进指标 CSV。
         "_sampled_goals": None,
+        "_history_diagnostics": {
+            "files": len(history), "rows": sum(len(f) for _, f in history),
+            "samples_per_checkpoint": history_samples_per_checkpoint,
+            "sampling_seed": history_sampling_seed,
+            "include_current": history_include_current,
+        },
     }
 
     if not history or historical_successes == 0:
         base_row.update(status="skipped:no_historical_successes", error="")
         if n_sampled_goals > 0:
             base_row["_sampled_goals"] = [(float("nan"), float("nan")) for _ in range(n_sampled_goals)]
+        return base_row
+
+    if method in {"flow_matching", "normalizing_flow"} and historical_successes < 2:
+        base_row.update(status="skipped:insufficient_historical_successes")
+        if n_sampled_goals > 0:
+            base_row["_sampled_goals"] = [(float("nan"), float("nan"))] * n_sampled_goals
+        return base_row
+
+    historical_failures = sum(len(f) for _, f in history) - historical_successes
+    if method == "nn" and (
+        historical_failures == 0 or (nn_early_stopping and min(historical_successes, historical_failures) < 2)
+    ):
+        # 分层 early-stopping 划分要求每类至少两条，不能用复制正样本掩盖不足。
+        base_row.update(status="skipped:insufficient_class_samples")
+        if n_sampled_goals > 0:
+            base_row["_sampled_goals"] = [(float("nan"), float("nan"))] * n_sampled_goals
         return base_row
 
     try:
@@ -331,6 +407,8 @@ def _run_one_job(
             nn_validation_fraction=nn_validation_fraction,
             nn_n_iter_no_change=nn_n_iter_no_change,
             fm_epochs=fm_epochs, fm_hidden=fm_hidden, fm_samples=fm_samples,
+            fm_lr=fm_lr, fm_ode_steps=fm_ode_steps, fm_weight_decay=fm_weight_decay,
+            fm_likelihood_batch_size=fm_likelihood_batch_size,
             nf_epochs=nf_epochs, nf_lr=nf_lr, nf_hidden=nf_hidden,
             nf_transforms=nf_transforms, nf_bins=nf_bins,
             nf_weight_decay=nf_weight_decay,
@@ -356,6 +434,8 @@ def _run_one_job(
                 estimator, history, checkpoint, kappa, goal_columns=goal_columns
             )
             positive_samples, _, _, _ = estimator.fit_evaluator()
+        if method == "flow_matching":
+            base_row["_fit_diagnostics"] = dict(estimator.fit_diagnostics_)
 
         if n_sampled_goals > 0:
             base_row["_sampled_goals"] = _sample_behavioral_goals(
@@ -375,7 +455,7 @@ def _run_one_job(
         # 固定网格 KL（诊断）
         grid = reference[goal_columns].to_numpy(dtype=float)
         success = reference.loc[reference["termination"] == "reach target", goal_columns].to_numpy(dtype=float)
-        if method in ("gmm", "nn", "normalizing_flow"):
+        if method in ("gmm", "nn", "flow_matching", "normalizing_flow"):
             _, gd = estimator.evaluate(grid)
             fixed_grid_kl = discrete_kl(success, grid, gd) if len(success) else float("nan")
         elif method == "kde":
@@ -462,9 +542,13 @@ def main() -> None:
     ap.add_argument("--nn-early-stopping", action=argparse.BooleanOptionalAction, default=True)
     ap.add_argument("--nn-validation-fraction", type=float, default=0.1)
     ap.add_argument("--nn-n-iter-no-change", type=int, default=10)
-    ap.add_argument("--fm-epochs", type=int, default=80)
-    ap.add_argument("--fm-hidden", type=int, default=16)
+    ap.add_argument("--fm-epochs", type=int, default=100)
+    ap.add_argument("--fm-hidden", type=int, default=32)
     ap.add_argument("--fm-samples", type=int, default=2000)
+    ap.add_argument("--fm-lr", type=float, default=1e-3)
+    ap.add_argument("--fm-ode-steps", type=int, default=32)
+    ap.add_argument("--fm-weight-decay", type=float, default=0.0)
+    ap.add_argument("--fm-likelihood-batch-size", type=int, default=1024)
     ap.add_argument("--nf-epochs", type=int, default=100)
     ap.add_argument("--nf-lr", type=float, default=1e-3)
     ap.add_argument("--nf-hidden", type=int, default=32)
@@ -473,6 +557,9 @@ def main() -> None:
     ap.add_argument("--nf-weight-decay", type=float, default=0.0)
     ap.add_argument("--mc-samples", type=int, default=100000)
     ap.add_argument("--mc-repeats", type=int, default=5)
+    ap.add_argument("--history-samples-per-checkpoint", type=int, default=0, help="每份历史文件有放回抽样行数；0 保留全量")
+    ap.add_argument("--history-sampling-seed", type=int, default=0)
+    ap.add_argument("--history-include-current", action="store_true", help="将当前 checkpoint 的抽样记录也纳入训练，复现旧投稿时间范围")
     ap.add_argument("--random-state", type=int, default=0)
     args = ap.parse_args()
 
@@ -505,6 +592,10 @@ def main() -> None:
                     fm_epochs=args.fm_epochs,
                     fm_hidden=args.fm_hidden,
                     fm_samples=args.fm_samples,
+                    fm_lr=args.fm_lr,
+                    fm_ode_steps=args.fm_ode_steps,
+                    fm_weight_decay=args.fm_weight_decay,
+                    fm_likelihood_batch_size=args.fm_likelihood_batch_size,
                     nf_epochs=args.nf_epochs,
                     nf_lr=args.nf_lr,
                     nf_hidden=args.nf_hidden,
@@ -513,6 +604,9 @@ def main() -> None:
                     nf_weight_decay=args.nf_weight_decay,
                     mc_samples=args.mc_samples,
                     mc_repeats=args.mc_repeats,
+                    history_samples_per_checkpoint=args.history_samples_per_checkpoint,
+                    history_sampling_seed=args.history_sampling_seed,
+                    history_include_current=args.history_include_current,
                 )
                 _append_row(row)
 

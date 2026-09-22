@@ -7,8 +7,7 @@
 - `--skip-done` 把 ok 和 skipped:* 视为已完成，error 行会重跑；
 - 可选地复现课程学习中的 MEGA/RIG/DISCERN 候选目标采样，并将每个
   checkpoint 的 sampled behavioral goals 写入独立 CSV；
-- 当前 kde、gmm、nn 和 normalizing_flow 已接入；flow_matching 等待实现和验证，
-  传入未验证的方法会明确报错，不会静默使用旧实现。
+- 当前 kde、gmm、nn、flow_matching 和 normalizing_flow 已接入。
 
 示例（只计算 KL 结果）：
   conda run -n gc_ope env OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 \\
@@ -35,6 +34,7 @@ for _name in _SINGLE_THREAD_VARS:
 import argparse
 import csv
 import fcntl
+import json
 import signal
 import sys
 import time
@@ -63,12 +63,8 @@ METRIC_COLUMNS = [
 ]
 
 ALL_METHODS = ["kde", "gmm", "nn", "flow_matching", "normalizing_flow"]
-AVAILABLE_METHODS = {"kde", "gmm", "nn", "normalizing_flow"}
-UNAVAILABLE_REASONS = {
-    "nn": "内部错误：NN 已注册但不可用",
-    "flow_matching": "等待按新协议实现并验证",
-    "normalizing_flow": "内部错误：Normalizing Flow 已注册但不可用",
-}
+AVAILABLE_METHODS = {"kde", "gmm", "nn", "flow_matching", "normalizing_flow"}
+UNAVAILABLE_REASONS = {}
 SAMPLING_METHODS = ["mega", "rig", "discern"]
 _ACTIVE_POOL: ProcessPoolExecutor | None = None
 _INTERRUPT_REQUESTED = False
@@ -239,7 +235,7 @@ def _run_job(checkpoint: int, args: argparse.Namespace) -> dict:
         bandwidth=args.bandwidth,
         random_state=args.random_state,
         gmm_reg_covar=args.gmm_reg_covar,
-        # 以下参数当前只服务旧 nn/fm 路线；gmm 不使用。
+        # 兼容单 job 接口的旧参数；GMM/FM 均不使用这两项。
         n_hist_bins=10,
         gaussian_reg_covar=1e-6,
         nn_epochs=args.nn_epochs,
@@ -251,6 +247,10 @@ def _run_job(checkpoint: int, args: argparse.Namespace) -> dict:
         fm_epochs=args.fm_epochs,
         fm_hidden=args.fm_hidden,
         fm_samples=args.fm_samples,
+        fm_lr=args.fm_lr,
+        fm_ode_steps=args.fm_ode_steps,
+        fm_weight_decay=args.fm_weight_decay,
+        fm_likelihood_batch_size=args.fm_likelihood_batch_size,
         nf_epochs=args.nf_epochs,
         nf_lr=args.nf_lr,
         nf_hidden=args.nf_hidden,
@@ -259,6 +259,9 @@ def _run_job(checkpoint: int, args: argparse.Namespace) -> dict:
         nf_weight_decay=args.nf_weight_decay,
         mc_samples=args.mc_samples,
         mc_repeats=args.mc_repeats,
+        history_samples_per_checkpoint=args.history_samples_per_checkpoint,
+        history_sampling_seed=args.history_sampling_seed,
+        history_include_current=args.history_include_current,
         n_sampled_goals=args.n_sampled_goals if args.save_sampled_goals else 0,
         candidate_goals=args.candidate_goals,
         sampling_method=args.sampling_method,
@@ -281,6 +284,7 @@ def main() -> None:
     parser.add_argument("--task", required=True, choices=["push", "slide"])
     parser.add_argument("--seed", required=True, type=int)
     parser.add_argument("--workers", type=int, default=4)
+    parser.add_argument("--checkpoints", type=int, nargs="+", help="只运行指定 checkpoint；默认全部 100 个")
     parser.add_argument("--output-dir", type=Path, default=OUT_DIR)
     parser.add_argument("--skip-done", action="store_true")
     parser.add_argument("--dry-run", action="store_true", help="只打印待运行任务，不执行评估")
@@ -292,22 +296,29 @@ def main() -> None:
     parser.add_argument("--random-state", type=int, default=0)
     parser.add_argument("--mc-samples", type=int, default=100000)
     parser.add_argument("--mc-repeats", type=int, default=5)
+    parser.add_argument("--history-samples-per-checkpoint", type=int, default=0, help="每个历史 checkpoint 从全部记录有放回抽样；0 使用全量")
+    parser.add_argument("--history-sampling-seed", type=int, default=0, help="所有方法共享的历史抽样种子")
+    parser.add_argument("--history-include-current", action="store_true", help="训练也使用当前 checkpoint 的抽样记录；默认只用严格历史")
     # 采样功能默认关闭，不改变原有只输出 KL 的命令行为。
     parser.add_argument("--save-sampled-goals", action="store_true", help="保存每个 checkpoint 的 behavioral goals")
     parser.add_argument("--n-sampled-goals", type=int, default=100, help="每个 checkpoint 采样的 behavioral goal 数")
     parser.add_argument("--candidate-goals", type=int, default=100, help="每个 behavioral goal 的候选目标数，对应训练 wrapper 的 sample_n")
     parser.add_argument("--sampling-method", choices=SAMPLING_METHODS, default="mega", help="复现课程 wrapper 的目标选择规则")
     parser.add_argument("--sampling-seed", type=int, default=0, help="离线 behavioral-goal 采样随机种子")
-    # 预留通用接口；当前 gmm 不使用，未来 nn/fm 接入时避免另建脚本。
+    # 各学习型方法独立配置；不会改变其它方法的训练参数。
     parser.add_argument("--nn-epochs", type=int, default=100)
     parser.add_argument("--nn-lr", type=float, default=1e-3)
     parser.add_argument("--nn-hidden", type=int, default=16)
     parser.add_argument("--nn-early-stopping", action=argparse.BooleanOptionalAction, default=True, help="是否启用随机 validation 和 early stopping；默认开启")
     parser.add_argument("--nn-validation-fraction", type=float, default=0.1, help="NN 随机验证集比例")
     parser.add_argument("--nn-n-iter-no-change", type=int, default=10, help="验证集指标连续多少轮不改善后停止")
-    parser.add_argument("--fm-epochs", type=int, default=80)
-    parser.add_argument("--fm-hidden", type=int, default=16)
-    parser.add_argument("--fm-samples", type=int, default=2000)
+    parser.add_argument("--fm-epochs", type=int, default=100, help="FM 优化更新轮数；每轮加权抽样一次，不使用 validation")
+    parser.add_argument("--fm-hidden", type=int, default=32)
+    parser.add_argument("--fm-samples", type=int, default=2000, help="每个 FM epoch 的加权目标抽样数")
+    parser.add_argument("--fm-lr", type=float, default=1e-3)
+    parser.add_argument("--fm-ode-steps", type=int, default=32, help="FM likelihood 的 RK4 步数")
+    parser.add_argument("--fm-weight-decay", type=float, default=0.0)
+    parser.add_argument("--fm-likelihood-batch-size", type=int, default=1024, help="FM 密度查询分块大小")
     parser.add_argument("--nf-epochs", type=int, default=100)
     parser.add_argument("--nf-lr", type=float, default=1e-3)
     parser.add_argument("--nf-hidden", type=int, default=32)
@@ -316,6 +327,16 @@ def main() -> None:
     parser.add_argument("--nf-weight-decay", type=float, default=0.0)
     args = parser.parse_args()
 
+    if args.history_samples_per_checkpoint < 0 or args.history_sampling_seed < 0:
+        parser.error("历史抽样数量和种子不能为负")
+    if args.mc_samples < 1 or args.mc_repeats < 1:
+        parser.error("MC 样本数和重复次数必须为正")
+
+    if args.method == "flow_matching":
+        if min(args.fm_epochs, args.fm_hidden, args.fm_samples, args.fm_ode_steps, args.fm_likelihood_batch_size) <= 0:
+            parser.error("FM 的轮数、宽度、抽样数、积分步数和查询块大小必须为正")
+        if not (0 < args.fm_lr < float("inf")) or not (0 <= args.fm_weight_decay < float("inf")):
+            parser.error("FM 学习率必须为正有限数，weight decay 必须非负有限")
     if args.method not in AVAILABLE_METHODS:
         parser.error(
             f"method {args.method!r} is registered but not available yet: "
@@ -329,6 +350,19 @@ def main() -> None:
         parser.error("--candidate-goals must be >= 1")
 
     output = _output_path(args.output_dir, args.method, args.task, args.seed)
+    # 抽样实验写独立配置，拒绝把不同协议的结果当成已完成任务混用。
+    config_path = output.with_suffix(".config.json")
+    if args.history_samples_per_checkpoint or args.history_include_current or config_path.exists():
+        excluded = {"output_dir", "workers", "checkpoints", "skip_done", "dry_run"}
+        config = {k: v for k, v in vars(args).items() if k not in excluded}
+        if config_path.exists():
+            if json.loads(config_path.read_text()) != config:
+                parser.error(f"输出目录已存在不同参数的结果，请另选目录: {config_path}")
+        elif output.exists() and output.stat().st_size:
+            parser.error(f"已有 CSV 缺少抽样协议配置，不能安全续跑: {output}")
+        elif not args.dry_run:
+            args.output_dir.mkdir(parents=True, exist_ok=True)
+            config_path.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n")
     _validate_output_scope(output, args.task, args.seed, args.method)
     sampled_output = _sampled_goals_output_path(args.output_dir, args.method, args.task, args.seed)
     if args.save_sampled_goals:
@@ -341,7 +375,10 @@ def main() -> None:
         else set()
     )
     done = metric_done & sampled_done if args.save_sampled_goals and args.skip_done else metric_done
-    todo = [checkpoint for checkpoint in ALL100_CHECKPOINTS if checkpoint not in done]
+    checkpoints = args.checkpoints or ALL100_CHECKPOINTS
+    if len(set(checkpoints)) != len(checkpoints) or not set(checkpoints) <= set(ALL100_CHECKPOINTS):
+        parser.error("--checkpoints 必须是不重复的 10000..1000000（步长 10000）")
+    todo = [checkpoint for checkpoint in sorted(checkpoints) if checkpoint not in done]
 
     print(f"method={args.method}, task={args.task}, seed={args.seed}")
     print(f"output: {output}")
@@ -351,7 +388,7 @@ def main() -> None:
             f"sampling: method={args.sampling_method}, goals/checkpoint={args.n_sampled_goals}, "
             f"candidates/goal={args.candidate_goals}, seed={args.sampling_seed}"
         )
-    print(f"jobs: {len(todo)}/{len(ALL100_CHECKPOINTS)} to run ({len(done)} already done)")
+    print(f"jobs: {len(todo)}/{len(checkpoints)} to run ({len(set(checkpoints) & done)} already done)")
     if args.dry_run:
         preview = ", ".join(str(checkpoint) for checkpoint in todo[:10])
         suffix = " ..." if len(todo) > 10 else ""
