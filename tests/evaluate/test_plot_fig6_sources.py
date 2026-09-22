@@ -53,3 +53,17 @@ def test_missing_nn_checkpoint_prevents_plot(sources):
     pd.read_csv(path).iloc[:1].to_csv(path, index=False)
     with pytest.raises(ValueError, match="覆盖率"):
         plot.load_data(old, legacy, new)
+
+
+def test_weighted_em_adds_sixth_method_without_replacing_gmm(sources, tmp_path):
+    plot, old, new, legacy = sources
+    em = tmp_path / "em"
+    (em / "method_per_seed").mkdir(parents=True)
+    for seed in range(1, 6):
+        frame = pd.read_csv(old / "method_per_seed" / f"gmm_push_seed{seed}.csv")
+        frame["method"], frame["protocol"], frame["kl"] = "gmm_em", "push_same_family_gmm_em_v1", .03
+        frame.to_csv(em / "method_per_seed" / f"gmm_em_push_seed{seed}.csv", index=False)
+    data, audit, _ = plot.load_data(old, legacy, new, em)
+    assert len(data) == 60 and data.method.nunique() == 6
+    assert (data.loc[data.method == "GMM", "kl"] == .5).all()
+    assert (data.loc[data.method == "GMM (weighted EM)", "kl"] == .03).all()

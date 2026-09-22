@@ -92,6 +92,20 @@ def test_nn_only_preserves_5_by_4_parallelism(tmp_path):
     assert "--methods fm" not in result.stdout
 
 
+def test_weighted_em_runs_as_separate_method(tmp_path):
+    args = arguments(tmp_path)
+    settings = tmp_path / "settings.json"
+    config = json.loads(settings.read_text())
+    config["protocol"] = "push_same_family_gmm_em_v1"
+    config["parameters"]["gmm_em"] = {"n_components": 2}
+    settings.write_text(json.dumps(config))
+    result = subprocess.run([*args, "--methods", "gmm_em"], capture_output=True, text=True, timeout=120)
+    assert result.returncode == 0, result.stdout + result.stderr
+    outputs = list((tmp_path / "result/method_per_seed").glob("*.csv"))
+    assert len(outputs) == 5 and all(p.name.startswith("gmm_em_") for p in outputs)
+    assert json.loads((tmp_path / "result/audit.json").read_text())["status"] == "complete"
+
+
 def test_signal_cleans_seed_processes_and_workers(tmp_path):
     args = arguments(tmp_path, slow=True)
     with (tmp_path / "launch.log").open("w") as log:

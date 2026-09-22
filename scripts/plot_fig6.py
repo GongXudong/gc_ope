@@ -18,16 +18,19 @@ from scipy.ndimage import gaussian_filter1d
 from gc_ope.evaluate.offline_results import audit_result, sha256
 
 
-METHODS = ["KDE (legacy)", "GMM", "NN", "FM", "NF"]
+METHODS = ["KDE (legacy)", "GMM", "NN", "FM", "NF", "GMM (weighted EM)"]
 EXPECTED = list(range(10000, 1000001, 10000))
 
 
-def load_data(result_root, legacy_root, nn_result_root=None):
+def load_data(result_root, legacy_root, nn_result_root=None, gmm_em_result_root=None):
     """核对每份 CSV 后读取有效记录；不把跳过项补成零。"""
     frames, audit, hashes = [], {}, {}
-    for method in ["gmm", "nn", "fm", "nf"]:
+    methods = ["gmm", "nn", "fm", "nf"] + (["gmm_em"] if gmm_em_result_root is not None else [])
+    for method in methods:
         protocols = set()
         root = nn_result_root if method == "nn" and nn_result_root is not None else result_root
+        if method == "gmm_em":
+            root = gmm_em_result_root
         for seed in range(1, 6):
             path = root / "method_per_seed" / f"{method}_push_seed{seed}.csv"
             check = audit_result(path, EXPECTED)
@@ -37,6 +40,8 @@ def load_data(result_root, legacy_root, nn_result_root=None):
             allowed = {"push_same_family_inclusive_v1", "push_same_family_nn_logloss_v2"}
             if method == "nn" and nn_result_root is not None:
                 allowed = {"push_same_family_nn_logloss_v2"}
+            if method == "gmm_em":
+                allowed = {"push_same_family_gmm_em_v1"}
             if not ((frame.task == "push") & (frame.seed == seed) & (frame.method == method)
                     & frame.protocol.isin(allowed) & (frame.kl_mode == "raw")).all():
                 raise ValueError(f"实验身份或协议不一致：{path}")
@@ -50,7 +55,8 @@ def load_data(result_root, legacy_root, nn_result_root=None):
             check["excluded"] = frame.loc[frame.status != "ok", ["checkpoint", "status", "error"]].to_dict("records")
             audit[f"{method}_seed{seed}"] = check
             frame = frame.loc[frame.status == "ok", ["seed", "checkpoint", "kl"]].copy()
-            frame["method"], frame["source"] = method.upper(), str(path)
+            frame["method"] = "GMM (weighted EM)" if method == "gmm_em" else method.upper()
+            frame["source"] = str(path)
             frames.append(frame)
             hashes[str(path)] = sha256(path)
     for seed in range(1, 6):
@@ -100,12 +106,14 @@ def draw(data, summary, output, tag, ymax):
     """沿用原 Fig.6 的大小、配色、线宽与图例；完整范围另用 symlog 展示。"""
     sns.set_theme(context="notebook", style="darkgrid", font_scale=2.0)
     palette = sns.color_palette("deep")
-    colors = dict(zip(METHODS, [palette[i] for i in [0, 2, 4, 1, 3]]))
+    colors = dict(zip(METHODS, [palette[i] for i in [0, 2, 4, 1, 3, 5]]))
     limits = {}
     for full in [False, True]:
         fig, ax = plt.subplots(figsize=(10, 8))
         for method in METHODS:
             series = summary[summary.method == method].sort_values("checkpoint")
+            if series.empty:
+                continue
             # 防止线段跨过真正缺失的 checkpoint。
             series = series.set_index("checkpoint").reindex(EXPECTED)
             ax.plot(series.index, series["mean"], color=colors[method], linewidth=1.5, label=method)
@@ -138,12 +146,14 @@ def main():
     parser.add_argument("--result-root", type=Path, default=ROOT / "logs/push_same_family_all100_5x4")
     parser.add_argument("--nn-result-root", type=Path,
                         help="单独重跑的 NN 总目录；必须包含 method_per_seed/ 和 v2 协议")
+    parser.add_argument("--gmm-em-result-root", type=Path,
+                        help="新增直接加权 EM 结果目录；作为第六条曲线加入，保留旧 GMM")
     parser.add_argument("--legacy-root", type=Path, default=ROOT.parent / "gc_ope/plots/p_ag_dist_between_truth_and_estimated_in_training/my_push/sac/eval_data")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--linear-ymax", type=float, default=None)
     args = parser.parse_args()
     # 每次另存，保护原图；用户可以显式选新的输出目录重复绘图。
-    data, audit, hashes = load_data(args.result_root, args.legacy_root, args.nn_result_root)
+    data, audit, hashes = load_data(args.result_root, args.legacy_root, args.nn_result_root, args.gmm_em_result_root)
     args.output.mkdir(parents=True, exist_ok=False)
     smoothed = smooth_seeds(data)
     summaries = {"raw": summarize(data), "gaussian2": summarize(smoothed)}
@@ -167,6 +177,7 @@ def main():
     metadata = {"coverage": audit, "input_sha256": hashes, "script_sha256": sha256(__file__),
                 "result_root": str(args.result_root.resolve()),
                 "nn_result_root": str(args.nn_result_root.resolve()) if args.nn_result_root else None,
+                "gmm_em_result_root": str(args.gmm_em_result_root.resolve()) if args.gmm_em_result_root else None,
                 "linear_range_reference_from": 200000,
                 "smoothing": "逐方法、逐 seed、连续片段：gaussian_filter1d(sigma=2, mode=reflect, truncate=4)",
                 "aggregation": "有效 seed 均值及 1000 次 bootstrap 的逐点 95% CI；先平滑 seed，再汇总",
@@ -188,7 +199,7 @@ def main():
         "新方法的 KL 为各自全量拟合参考分布到历史估计分布；不同方法的参考分布不同。"
         "KDE (legacy) 来自旧投稿的 `$D_{KL}$ [his]` 列，标准化、过滤、带宽和 MC 协议有差异。"
         "本图不能据 KL 大小直接推断共同真实分布下的方法优劣。\n\n"
-        f"四种新方法共 {n_ok + n_skipped} 条记录：{n_ok} 有效、{n_skipped} 条样本不足跳过。逐文件检查、有效 seed 数、"
+        f"本次新方法共 {n_ok + n_skipped} 条记录：{n_ok} 有效、{n_skipped} 条样本不足跳过。逐文件检查、有效 seed 数、"
         "数据与汇总表、超界点和源文件 SHA256 均另存，原实验文件未修改。\n"
         f"其中 {n_warnings} 条记录带拟合质量提醒，未删除；具体原因及各方法协议见 plot_config.json。\n"
     )

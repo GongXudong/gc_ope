@@ -26,6 +26,7 @@ from gc_ope.evaluate.offline_results import (
 
 
 METHODS = ("nn", "fm", "nf", "gmm")
+AVAILABLE_METHODS = (*METHODS, "gmm_em")
 
 
 def run_directory(output, method, seed):
@@ -118,14 +119,14 @@ def main():
     parser.add_argument("--checkpoint-root", type=Path, default=ROOT.parent / "gc_ope/checkpoints")
     parser.add_argument("--output", type=Path, default=ROOT / "logs/push_same_family_nn_logloss_v2_5x4")
     parser.add_argument("--config", type=Path, default=ROOT / "configs/evaluate/push_same_family_all100.json")
-    parser.add_argument("--methods", nargs="+", choices=METHODS, default=list(METHODS),
+    parser.add_argument("--methods", nargs="+", choices=AVAILABLE_METHODS, default=list(METHODS),
                         help="默认四方法；修正 NN 后可只重跑 nn，仍保留五 seed × 四 worker")
     parser.add_argument("--seeds", type=int, nargs="+", choices=range(1, 6), default=[1, 2, 3, 4, 5])
     parser.add_argument("--checkpoints", type=int, nargs="+", default=list(range(10000, 1000001, 10000)))
     parser.add_argument("--workers-per-seed", type=int, choices=range(1, 5), default=4)
     parser.add_argument("--dry-run", action="store_true", help="只检查输入并打印命令，不创建目录、不启动实验")
     args = parser.parse_args()
-    methods = [method for method in METHODS if method in args.methods]
+    methods = [method for method in AVAILABLE_METHODS if method in args.methods]
     args.checkpoint_root, args.output, args.config = args.checkpoint_root.resolve(), args.output.resolve(), args.config.resolve()
     args.seeds, args.checkpoints = sorted(set(args.seeds)), sorted(set(args.checkpoints))
     settings = json.loads(args.config.read_text())

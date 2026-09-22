@@ -37,7 +37,7 @@ def test_history_is_shared_inclusive_and_stable(tmp_path):
 
 
 @pytest.mark.parametrize("method,parameters", [
-    ("gmm", {}), ("nn", {"n_epochs": 2, "early_stopping": False}),
+    ("gmm", {}), ("gmm_em", {}), ("nn", {"n_epochs": 2, "early_stopping": False}),
     ("nf", {"n_epochs": 1}), ("fm", {"n_epochs": 1, "samples_per_epoch": 16, "ode_steps": 2}),
 ])
 def test_pair_is_same_family_independent_and_uses_correct_records(tmp_path, method, parameters):

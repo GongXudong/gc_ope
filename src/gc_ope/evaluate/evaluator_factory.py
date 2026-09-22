@@ -9,6 +9,7 @@ from gc_ope.evaluate.evaluator_common import InsufficientSamples
 DEFAULT_PARAMETERS = {
     "kde": {"kde_bandwidth": 0.2},
     "gmm": {"n_components": 5, "resample_size": 1000, "random_state": 0},
+    "gmm_em": {"n_components": 5, "covariance_type": "full", "random_state": 0},
     "nn": {"hidden_layer_sizes": [16, 16], "n_epochs": 500, "bandwidth": 0.2, "random_state": 0},
     "nf": {"n_epochs": 100, "hidden_features": 32, "random_state": 0},
     "fm": {"n_epochs": 500, "hidden_features": 32, "samples_per_epoch": 2000, "random_state": 0},
@@ -19,10 +20,11 @@ def make_evaluator(method, *, kappa=0.9, support_goals=None, parameters=None):
     """每次调用构造一个全新模型；两侧配置相同但不共享已拟合参数。"""
     from gc_ope.evaluate.evaluator_kde import KDEEvaluator
     from gc_ope.evaluate.evaluator_gmm import GMMEvaluator
+    from gc_ope.evaluate.evaluator_gmm_em import WeightedGMMEvaluator
     from gc_ope.evaluate.evaluator_nn import GoalSuccessMLPClassifierEvaluator
     from gc_ope.evaluate.evaluator_nf import NormalizingFlowDensityEvaluator
     from gc_ope.evaluate.evaluator_fm import FlowMatchingDensityEvaluator
-    classes = dict(kde=KDEEvaluator, gmm=GMMEvaluator, nn=GoalSuccessMLPClassifierEvaluator,
+    classes = dict(kde=KDEEvaluator, gmm=GMMEvaluator, gmm_em=WeightedGMMEvaluator, nn=GoalSuccessMLPClassifierEvaluator,
                    nf=NormalizingFlowDensityEvaluator, fm=FlowMatchingDensityEvaluator)
     if method not in classes:
         raise ValueError(f"未知估计方法：{method}")

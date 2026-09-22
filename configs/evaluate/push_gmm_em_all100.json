@@ -1,0 +1,21 @@
+{
+  "protocol": "push_same_family_gmm_em_v1",
+  "kappa": 0.9,
+  "samples_per_checkpoint": 100,
+  "sampling_seed": 0,
+  "mc_samples": 10000,
+  "mc_repeats": 5,
+  "mc_seed": 0,
+  "kl_mode": "raw",
+  "parameters": {
+    "gmm_em": {
+      "n_components": 5,
+      "covariance_type": "full",
+      "n_init": 1,
+      "max_iter": 200,
+      "tol": 0.001,
+      "reg_covar": 0.000001,
+      "random_state": 0
+    }
+  }
+}

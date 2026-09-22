@@ -13,6 +13,7 @@ from gc_ope.evaluate.evaluator_kde import KDEEvaluator
 
 PARAMETERS = {
     "gmm": {"n_components": 2},
+    "gmm_em": {"n_components": 2},
     "nn": {"n_epochs": 2, "early_stopping": False},
     "nf": {"n_epochs": 1, "hidden_features": 8, "transforms": 2},
     "fm": {"n_epochs": 1, "hidden_features": 8, "samples_per_epoch": 32, "ode_steps": 2},

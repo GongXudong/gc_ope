@@ -10,7 +10,7 @@ from gc_ope.evaluate.utils.distribution_kl import monte_carlo_kl
 
 
 PARAMETERS = {
-    "kde": {}, "gmm": {"n_components": 2},
+    "kde": {}, "gmm": {"n_components": 2}, "gmm_em": {"n_components": 2},
     "nn": {"n_epochs": 5, "early_stopping": False},
     "nf": {"n_epochs": 2, "hidden_features": 8, "transforms": 2},
     "fm": {"n_epochs": 2, "hidden_features": 8, "samples_per_epoch": 32, "ode_steps": 8},
