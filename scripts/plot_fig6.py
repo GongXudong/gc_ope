@@ -19,18 +19,24 @@ from gc_ope.evaluate.offline_results import audit_result, sha256
 
 
 REGULARIZED_EM = "Weighted EM (reg=0.05)"
-METHODS = ["KDE (legacy)", "GMM", "NN", "FM", "NF", "GMM (weighted EM)", REGULARIZED_EM]
+METHODS = ["KDE (legacy)", "GMM", "NN", "FM", "NF", "GMM (weighted EM)", REGULARIZED_EM,
+           "NF (regularized)", "FM (regularized)", "FM (ensemble)"]
 EXPECTED = list(range(10000, 1000001, 10000))
 
 
 def load_data(result_root, legacy_root, nn_result_root=None, gmm_em_result_root=None,
-              gmm_em_reg005_result_root=None):
+              gmm_em_reg005_result_root=None, nf_reg_result_root=None, fm_reg_result_root=None,
+              fm_ensemble_result_root=None):
     """核对每份 CSV 后读取有效记录；不把跳过项补成零。"""
     frames, audit, hashes = [], {}, {}
     sources = [(method, method, nn_result_root if method == "nn" and nn_result_root is not None else result_root)
                for method in ["gmm", "nn", "fm", "nf"]]
     if gmm_em_result_root is not None:
         sources.append(("gmm_em", "gmm_em", gmm_em_result_root))
+    for method, root in [("nf_reg", nf_reg_result_root), ("fm_reg", fm_reg_result_root),
+                         ("fm_ensemble", fm_ensemble_result_root)]:
+        if root is not None:
+            sources.append((method, method, root))
     if gmm_em_reg005_result_root is not None:
         if gmm_em_result_root is None:
             raise ValueError("正则化对照必须同时提供原加权 EM，不能静默替换原曲线")
@@ -59,6 +65,8 @@ def load_data(result_root, legacy_root, nn_result_root=None, gmm_em_result_root=
                 allowed = {"push_same_family_nn_logloss_v2"}
             if method == "gmm_em":
                 allowed = {"push_same_family_gmm_em_v1"}
+            if method in {"nf_reg", "fm_reg", "fm_ensemble"}:
+                allowed = {"push_regularized_flows_v1"}
             if not ((frame.task == "push") & (frame.seed == seed) & (frame.method == method)
                     & frame.protocol.isin(allowed) & (frame.kl_mode == "raw")).all():
                 raise ValueError(f"实验身份或协议不一致：{path}")
@@ -75,6 +83,10 @@ def load_data(result_root, legacy_root, nn_result_root=None, gmm_em_result_root=
             frame["method"] = "GMM (weighted EM)" if method == "gmm_em" else method.upper()
             if source_key == "gmm_em_reg005":
                 frame["method"] = REGULARIZED_EM
+            if method in {"nf_reg", "fm_reg"}:
+                frame["method"] = method[:2].upper() + " (regularized)"
+            if method == "fm_ensemble":
+                frame["method"] = "FM (ensemble)"
             frame["source"] = str(path)
             frames.append(frame)
             hashes[str(path)] = sha256(path)
@@ -125,7 +137,7 @@ def draw(data, summary, output, tag, ymax):
     """沿用原 Fig.6 的大小、配色、线宽与图例；完整范围另用 symlog 展示。"""
     sns.set_theme(context="notebook", style="darkgrid", font_scale=2.0)
     palette = sns.color_palette("deep")
-    colors = dict(zip(METHODS, [palette[i] for i in [0, 2, 4, 1, 3, 5, 9]]))
+    colors = dict(zip(METHODS, [palette[i] for i in [0, 2, 4, 1, 3, 5, 9, 6, 7, 8]]))
     limits = {}
     for full in [False, True]:
         fig, ax = plt.subplots(figsize=(10, 8))
@@ -136,14 +148,15 @@ def draw(data, summary, output, tag, ymax):
             # 防止线段跨过真正缺失的 checkpoint。
             series = series.set_index("checkpoint").reindex(EXPECTED)
             ax.plot(series.index, series["mean"], color=colors[method], linewidth=1.5, label=method,
-                    linestyle="--" if method == REGULARIZED_EM else "-")
+                    linestyle="--" if method == REGULARIZED_EM else ("-." if "regularized" in method or "ensemble" in method else "-"))
             ax.fill_between(series.index, series.ci_low, series.ci_high, color=colors[method], alpha=.2)
         ax.set_xlabel("Environment Steps")
         ax.set_ylabel(r"$D_{\mathrm{KL}}(p_{\mathrm{reference}}\,\|\,p_{\mathrm{history}})$")
         ax.margins(x=.05)
         extended = REGULARIZED_EM in summary.method.values
-        ax.legend(title="Estimation Method", loc="upper right", fontsize=16 if extended else 18,
-                  title_fontsize=18 if extended else None)
+        many = summary.method.nunique() > 7
+        ax.legend(title="Estimation Method", loc="upper right", fontsize=14 if many else (16 if extended else 18),
+                  title_fontsize=16 if many else (18 if extended else None))
         if full:
             ax.set_yscale("symlog", linthresh=1e-3)
             upper = max(float(data.kl.max()), float(summary.ci_high.max())) * 1.15
@@ -172,13 +185,17 @@ def main():
                         help="新增直接加权 EM 结果目录；作为第六条曲线加入，保留旧 GMM")
     parser.add_argument("--gmm-em-reg005-result-root", type=Path,
                         help="reg_covar=0.05 的加权 EM 对照；作为第七条曲线，保留原加权 EM")
+    parser.add_argument("--nf-reg-result-root", type=Path, help="正则化 NF 结果，保留原 NF")
+    parser.add_argument("--fm-reg-result-root", type=Path, help="正则化 FM 结果，保留原 FM")
+    parser.add_argument("--fm-ensemble-result-root", type=Path, help="FM 密度集成结果，保留原 FM")
     parser.add_argument("--legacy-root", type=Path, default=ROOT.parent / "gc_ope/plots/p_ag_dist_between_truth_and_estimated_in_training/my_push/sac/eval_data")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--linear-ymax", type=float, default=None)
     args = parser.parse_args()
     # 每次另存，保护原图；用户可以显式选新的输出目录重复绘图。
     data, audit, hashes = load_data(args.result_root, args.legacy_root, args.nn_result_root,
-                                   args.gmm_em_result_root, args.gmm_em_reg005_result_root)
+                                   args.gmm_em_result_root, args.gmm_em_reg005_result_root,
+                                   args.nf_reg_result_root, args.fm_reg_result_root, args.fm_ensemble_result_root)
     args.output.mkdir(parents=True, exist_ok=False)
     smoothed = smooth_seeds(data)
     summaries = {"raw": summarize(data), "gaussian2": summarize(smoothed)}
@@ -204,6 +221,9 @@ def main():
                 "nn_result_root": str(args.nn_result_root.resolve()) if args.nn_result_root else None,
                 "gmm_em_result_root": str(args.gmm_em_result_root.resolve()) if args.gmm_em_result_root else None,
                 "gmm_em_reg005_result_root": str(args.gmm_em_reg005_result_root.resolve()) if args.gmm_em_reg005_result_root else None,
+                "nf_reg_result_root": str(args.nf_reg_result_root.resolve()) if args.nf_reg_result_root else None,
+                "fm_reg_result_root": str(args.fm_reg_result_root.resolve()) if args.fm_reg_result_root else None,
+                "fm_ensemble_result_root": str(args.fm_ensemble_result_root.resolve()) if args.fm_ensemble_result_root else None,
                 "linear_range_reference_from": 200000,
                 "smoothing": "逐方法、逐 seed、连续片段：gaussian_filter1d(sigma=2, mode=reflect, truncate=4)",
                 "aggregation": "有效 seed 均值及 1000 次 bootstrap 的逐点 95% CI；先平滑 seed，再汇总",

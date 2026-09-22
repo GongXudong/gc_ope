@@ -13,6 +13,9 @@ DEFAULT_PARAMETERS = {
     "nn": {"hidden_layer_sizes": [16, 16], "n_epochs": 500, "bandwidth": 0.2, "random_state": 0},
     "nf": {"n_epochs": 100, "hidden_features": 32, "random_state": 0},
     "fm": {"n_epochs": 500, "hidden_features": 32, "samples_per_epoch": 2000, "random_state": 0},
+    "nf_reg": {"random_state": 0},
+    "fm_reg": {"random_state": 0},
+    "fm_ensemble": {"n_members": 3, "random_state": 0},
 }
 
 
@@ -24,8 +27,11 @@ def make_evaluator(method, *, kappa=0.9, support_goals=None, parameters=None):
     from gc_ope.evaluate.evaluator_nn import GoalSuccessMLPClassifierEvaluator
     from gc_ope.evaluate.evaluator_nf import NormalizingFlowDensityEvaluator
     from gc_ope.evaluate.evaluator_fm import FlowMatchingDensityEvaluator
+    from gc_ope.evaluate.evaluator_regularized_flow import RegularizedNFEvaluator, RegularizedFMEvaluator
+    from gc_ope.evaluate.evaluator_flow_ensemble import FlowEnsembleEvaluator
     classes = dict(kde=KDEEvaluator, gmm=GMMEvaluator, gmm_em=WeightedGMMEvaluator, nn=GoalSuccessMLPClassifierEvaluator,
-                   nf=NormalizingFlowDensityEvaluator, fm=FlowMatchingDensityEvaluator)
+                   nf=NormalizingFlowDensityEvaluator, fm=FlowMatchingDensityEvaluator,
+                   nf_reg=RegularizedNFEvaluator, fm_reg=RegularizedFMEvaluator, fm_ensemble=FlowEnsembleEvaluator)
     if method not in classes:
         raise ValueError(f"未知估计方法：{method}")
     kwargs = {**DEFAULT_PARAMETERS[method], **(parameters or {})}
@@ -45,6 +51,6 @@ def fit_evaluator(method, estimator):
     count = int(flags.sum())
     if count == 0:
         raise InsufficientSamples("没有成功样本")
-    if method in {"nf", "fm"} and count < 2:
+    if method in {"nf", "fm", "nf_reg", "fm_reg", "fm_ensemble"} and count < 2:
         raise InsufficientSamples(f"{method} 至少需要两个成功样本")
     return estimator.fit_evaluator()

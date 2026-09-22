@@ -14,6 +14,9 @@ PARAMETERS = {
     "nn": {"n_epochs": 5, "early_stopping": False},
     "nf": {"n_epochs": 2, "hidden_features": 8, "transforms": 2},
     "fm": {"n_epochs": 2, "hidden_features": 8, "samples_per_epoch": 32, "ode_steps": 8},
+    "nf_reg": {"n_epochs": 2, "hidden_features": 8, "transforms": 2, "early_stopping": False},
+    "fm_reg": {"n_epochs": 2, "hidden_features": 8, "samples_per_epoch": 32, "ode_steps": 8, "early_stopping": False},
+    "fm_ensemble": {"n_members": 2, "member_parameters": {"n_epochs": 2, "hidden_features": 8, "samples_per_epoch": 32, "ode_steps": 8}},
 }
 
 

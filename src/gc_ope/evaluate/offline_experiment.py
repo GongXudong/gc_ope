@@ -72,7 +72,7 @@ def run_checkpoint(config, method, seed, checkpoint):
         warnings = [f"{side}侧：{message}" for side, model in
                     [("历史", estimate_model), ("参考", reference_model)]
                     for message in getattr(model, "fit_diagnostics_", {}).get("quality_warnings", [])]
-        if method == "gmm_em" or (method == "nn" and estimate_model.early_stopping):
+        if method in {"gmm_em", "nf_reg", "fm_reg", "fm_ensemble"} or (method == "nn" and estimate_model.early_stopping):
             row["fit_quality"] = "warning" if warnings else "passed_checks"
         row["fit_warnings"] = "；".join(warnings)
         metric = monte_carlo_kl(reference_model, estimate_model, config.mc_samples,

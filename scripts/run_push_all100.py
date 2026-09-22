@@ -26,7 +26,7 @@ from gc_ope.evaluate.offline_results import (
 
 
 METHODS = ("nn", "fm", "nf", "gmm")
-AVAILABLE_METHODS = (*METHODS, "gmm_em")
+AVAILABLE_METHODS = (*METHODS, "gmm_em", "nf_reg", "fm_reg", "fm_ensemble")
 
 
 def run_directory(output, method, seed):

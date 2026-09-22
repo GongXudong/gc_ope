@@ -54,6 +54,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--checkpoint-root", type=Path, default=ROOT.parent / "gc_ope/checkpoints")
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--base-config", type=Path, default=ROOT / "configs/evaluate/push_same_family_all100.json")
+    parser.add_argument("--candidates", type=Path, default=ROOT / "configs/evaluate/history_validation_candidates.json")
     parser.add_argument("--evaluate-selected", action="store_true", help="封存后计算小规模 MC KL；不用于选参")
     parser.add_argument("--smoke", action="store_true", help="仅检查加权 GMM 的小任务和完成记录")
     args = parser.parse_args()
@@ -66,9 +68,9 @@ def main():
 
     started = time.perf_counter()
     write_json(args.output / "process.json", dict(pid=os.getpid(), command=sys.argv))
-    base = json.loads((ROOT / "configs/evaluate/push_same_family_all100.json").read_text())
+    base = json.loads(args.base_config.read_text())
     base["parameters"].update(json.loads((ROOT / "configs/evaluate/push_gmm_em_all100.json").read_text())["parameters"])
-    candidates = json.loads((ROOT / "configs/evaluate/history_validation_candidates.json").read_text())
+    candidates = json.loads(args.candidates.read_text())
     # 先声明候选和任务，再运行；跨 seed 检查及全量参考 KL 均不能回头修改胜者。
     cases = [(1, step, split) for step in [100000, 400000, 1000000] for split in [1701, 1702]]
     transfer_seeds, transfer_steps, pilot_steps = [2, 3, 4, 5], [100000, 1000000], [10000, 100000, 1000000]
@@ -82,8 +84,8 @@ def main():
                validation_fraction=.2, group="source_checkpoint,csv_row", criterion="mean raw weighted heldout NLL",
                transfer_seeds=transfer_seeds, transfer_steps=transfer_steps,
                pilot_steps=pilot_steps, mc_samples=10000, mc_repeats=5))
-    source_paths = [Path(__file__), ROOT / "configs/evaluate/history_validation_candidates.json",
-                    ROOT / "configs/evaluate/push_same_family_all100.json", ROOT / "configs/evaluate/push_gmm_em_all100.json"]
+    source_paths = [Path(__file__), args.candidates, args.base_config,
+                    ROOT / "configs/evaluate/push_gmm_em_all100.json"]
     source_paths += list((ROOT / "src/gc_ope/evaluate").rglob("*.py"))
     input_paths = [path for seed in [1, *transfer_seeds] for step, path in fixed_files(args.checkpoint_root, seed).items()
                    if step <= max(case[1] for case in cases)]
@@ -100,7 +102,7 @@ def main():
     selected, scores = select_candidates(rows, resolved, cases)
     write_json(args.output / "selection.json", dict(selected=selected, scores=scores))
     chosen = {method: variants[selected[method]] for method, variants in resolved.items()}
-    experiment = {**base, "parameters": {**base["parameters"], **chosen}, "protocol": "push_history_validation_v1"}
+    experiment = {**base, "parameters": {**base["parameters"], **chosen}}
     write_json(args.output / "selected_experiment.json", experiment)
     sealed_hash = sha256(args.output / "selected_experiment.json")
     report(f"配置已封存：{selected}；SHA256={sealed_hash}")

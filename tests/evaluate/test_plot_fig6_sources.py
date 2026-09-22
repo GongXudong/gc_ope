@@ -95,3 +95,27 @@ def test_regularized_em_keeps_original_and_checks_configuration(sources, tmp_pat
     path.write_text(json.dumps(config))
     with pytest.raises(ValueError, match="还有差异"):
         plot.load_data(old, legacy, new, *roots)
+
+
+def test_regularized_flows_are_separate_curves(sources, tmp_path):
+    plot, old, new, legacy = sources
+    root = tmp_path / "regularized_flows"
+    (root / "method_per_seed").mkdir(parents=True)
+    for method in ["nf_reg", "fm_reg", "fm_ensemble"]:
+        for seed in range(1, 6):
+            frame = pd.read_csv(old / "method_per_seed" / f"{method[:2]}_push_seed{seed}.csv")
+            frame["method"], frame["protocol"], frame["kl"] = method, "push_regularized_flows_v1", .04
+            frame.to_csv(root / "method_per_seed" / f"{method}_push_seed{seed}.csv", index=False)
+    data, audit, hashes = plot.load_data(old, legacy, new, nf_reg_result_root=root, fm_reg_result_root=root,
+                                        fm_ensemble_result_root=root)
+    assert data.method.nunique() == 8 and len(data) == 80
+    assert (data.loc[data.method == "FM (ensemble)", "kl"] == .04).all()
+    for method in ["NF", "FM"]:
+        assert (data.loc[data.method == method, "kl"] == .5).all()
+        assert (data.loc[data.method == method + " (regularized)", "kl"] == .04).all()
+    path = root / "method_per_seed/nf_reg_push_seed1.csv"
+    frame = pd.read_csv(path)
+    frame["protocol"] = "push_same_family_inclusive_v1"
+    frame.to_csv(path, index=False)
+    with pytest.raises(ValueError, match="协议不一致"):
+        plot.load_data(old, legacy, new, nf_reg_result_root=root)

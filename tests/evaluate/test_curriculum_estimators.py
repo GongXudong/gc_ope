@@ -17,6 +17,9 @@ PARAMETERS = {
     "nn": {"n_epochs": 2, "early_stopping": False},
     "nf": {"n_epochs": 1, "hidden_features": 8, "transforms": 2},
     "fm": {"n_epochs": 1, "hidden_features": 8, "samples_per_epoch": 32, "ode_steps": 2},
+    "nf_reg": {"n_epochs": 2, "hidden_features": 8, "transforms": 2, "min_epochs": 1, "validation_interval": 1},
+    "fm_reg": {"n_epochs": 2, "hidden_features": 8, "samples_per_epoch": 32, "ode_steps": 2, "min_epochs": 1, "validation_interval": 1},
+    "fm_ensemble": {"n_members": 2, "member_parameters": {"n_epochs": 2, "hidden_features": 8, "samples_per_epoch": 32, "ode_steps": 2}},
 }
 
 
@@ -63,7 +66,7 @@ def test_real_push_and_sac_can_use_estimator(method, tmp_path):
         vec.close()
 
 
-@pytest.mark.parametrize("method", ["nn", "nf", "fm"])
+@pytest.mark.parametrize("method", ["nn", "nf", "fm", "nf_reg", "fm_reg", "fm_ensemble"])
 def test_early_sample_shortage_falls_back(method):
     wrapper = make_env(method)
     try:
