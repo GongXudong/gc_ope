@@ -1,0 +1,53 @@
+{
+  "kappa": 0.9,
+  "samples_per_checkpoint": 100,
+  "sampling_seed": 0,
+  "mc_samples": 10000,
+  "mc_repeats": 5,
+  "mc_seed": 0,
+  "kl_mode": "raw",
+  "parameters": {
+    "nn": {
+      "hidden_width": 16,
+      "n_epochs": 100,
+      "lr": 0.001,
+      "alpha": 0.0001,
+      "random_state": 0,
+      "early_stopping": true,
+      "validation_fraction": 0.1,
+      "n_iter_no_change": 10,
+      "bandwidth": 0.2
+    },
+    "fm": {
+      "n_epochs": 500,
+      "hidden_features": 32,
+      "samples_per_epoch": 2000,
+      "lr": 0.001,
+      "weight_decay": 0.0,
+      "ode_steps": 32,
+      "likelihood_batch_size": 1024,
+      "random_state": 0,
+      "device": "cpu"
+    },
+    "nf": {
+      "n_epochs": 100,
+      "hidden_features": 32,
+      "lr": 0.001,
+      "weight_decay": 0.0,
+      "transforms": 4,
+      "bins": 8,
+      "random_state": 0,
+      "device": "cpu"
+    },
+    "gmm": {
+      "n_components": 5,
+      "resample_size": 1000,
+      "covariance_type": "full",
+      "n_init": 1,
+      "max_iter": 200,
+      "tol": 0.001,
+      "random_state": 0,
+      "reg_covar": 0.000001
+    }
+  }
+}
