@@ -22,19 +22,31 @@ METHODS = ["KDE (legacy)", "GMM", "NN", "FM", "NF"]
 EXPECTED = list(range(10000, 1000001, 10000))
 
 
-def load_data(result_root, legacy_root):
+def load_data(result_root, legacy_root, nn_result_root=None):
     """核对每份 CSV 后读取有效记录；不把跳过项补成零。"""
     frames, audit, hashes = [], {}, {}
     for method in ["gmm", "nn", "fm", "nf"]:
+        protocols = set()
+        root = nn_result_root if method == "nn" and nn_result_root is not None else result_root
         for seed in range(1, 6):
-            path = result_root / "method_per_seed" / f"{method}_push_seed{seed}.csv"
+            path = root / "method_per_seed" / f"{method}_push_seed{seed}.csv"
             check = audit_result(path, EXPECTED)
             if check["missing"] or check["extra"] or check["invalid"]:
                 raise ValueError(f"结果未通过覆盖率检查：{path} {check}")
             frame = pd.read_csv(path)
+            allowed = {"push_same_family_inclusive_v1", "push_same_family_nn_logloss_v2"}
+            if method == "nn" and nn_result_root is not None:
+                allowed = {"push_same_family_nn_logloss_v2"}
             if not ((frame.task == "push") & (frame.seed == seed) & (frame.method == method)
-                    & (frame.protocol == "push_same_family_inclusive_v1") & (frame.kl_mode == "raw")).all():
+                    & frame.protocol.isin(allowed) & (frame.kl_mode == "raw")).all():
                 raise ValueError(f"实验身份或协议不一致：{path}")
+            protocols.update(frame.protocol.unique())
+            if len(protocols) != 1:
+                raise ValueError(f"同方法不同 seed 混用了协议：{method}")
+            check["protocol"] = next(iter(protocols))
+            # 质量提醒不会导致删点，但必须随图保存，避免把计算成功当作充分拟合。
+            check["quality_warnings"] = (frame.loc[frame.fit_quality == "warning",
+                ["checkpoint", "fit_warnings"]].to_dict("records") if "fit_quality" in frame else [])
             check["excluded"] = frame.loc[frame.status != "ok", ["checkpoint", "status", "error"]].to_dict("records")
             audit[f"{method}_seed{seed}"] = check
             frame = frame.loc[frame.status == "ok", ["seed", "checkpoint", "kl"]].copy()
@@ -124,13 +136,15 @@ def draw(data, summary, output, tag, ymax):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--result-root", type=Path, default=ROOT / "logs/push_same_family_all100_5x4")
+    parser.add_argument("--nn-result-root", type=Path,
+                        help="单独重跑的 NN 总目录；必须包含 method_per_seed/ 和 v2 协议")
     parser.add_argument("--legacy-root", type=Path, default=ROOT.parent / "gc_ope/plots/p_ag_dist_between_truth_and_estimated_in_training/my_push/sac/eval_data")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--linear-ymax", type=float, default=None)
     args = parser.parse_args()
     # 每次另存，保护原图；用户可以显式选新的输出目录重复绘图。
+    data, audit, hashes = load_data(args.result_root, args.legacy_root, args.nn_result_root)
     args.output.mkdir(parents=True, exist_ok=False)
-    data, audit, hashes = load_data(args.result_root, args.legacy_root)
     smoothed = smooth_seeds(data)
     summaries = {"raw": summarize(data), "gaussian2": summarize(smoothed)}
     # 自动线性范围覆盖 200000 步以后两版的全部 95% CI。
@@ -151,6 +165,8 @@ def main():
     if any(sha256(path) != digest for path, digest in hashes.items()):
         raise RuntimeError("绘图过程中输入结果发生变化，请重新检查")
     metadata = {"coverage": audit, "input_sha256": hashes, "script_sha256": sha256(__file__),
+                "result_root": str(args.result_root.resolve()),
+                "nn_result_root": str(args.nn_result_root.resolve()) if args.nn_result_root else None,
                 "linear_range_reference_from": 200000,
                 "smoothing": "逐方法、逐 seed、连续片段：gaussian_filter1d(sigma=2, mode=reflect, truncate=4)",
                 "aggregation": "有效 seed 均值及 1000 次 bootstrap 的逐点 95% CI；先平滑 seed，再汇总",
@@ -160,6 +176,7 @@ def main():
     current_audits = [value for key, value in audit.items() if not key.startswith("kde_legacy")]
     n_ok = sum(value["ok"] for value in current_audits)
     n_skipped = sum(value["skipped"] for value in current_audits)
+    n_warnings = sum(value["fit_warnings"] for value in current_audits)
     (args.output / "README.md").write_text(
         "# Fig.6：Push/SAC，seed 1～5\n\n"
         "主展示版：`fig6_gaussian2.png/pdf`；未平滑版：`fig6_raw.png/pdf`。\n"
@@ -173,6 +190,7 @@ def main():
         "本图不能据 KL 大小直接推断共同真实分布下的方法优劣。\n\n"
         f"四种新方法共 {n_ok + n_skipped} 条记录：{n_ok} 有效、{n_skipped} 条样本不足跳过。逐文件检查、有效 seed 数、"
         "数据与汇总表、超界点和源文件 SHA256 均另存，原实验文件未修改。\n"
+        f"其中 {n_warnings} 条记录带拟合质量提醒，未删除；具体原因及各方法协议见 plot_config.json。\n"
     )
     print(f"完成：{args.output}\n绘图数据 {len(data)} 条；线性显示上限 {ymax * 1.05:g}")
 
