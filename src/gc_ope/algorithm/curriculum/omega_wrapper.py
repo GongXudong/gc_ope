@@ -17,6 +17,7 @@ class OMEGAWrapper(MEGAWrapper):
         sample_dg_method: Literal["rig", "discern", "mega"] = "mega",
         b_used_in_omega: float=-3.0,  # Hyper-parameter used in OMEGA, refer to the Algorithm 2 in "Maximum Entropy Gain Exploration for Long Horizon Multi-Goal Reinforcement Learning"
         eval_kl_u_p_args: dict={},
+        estimator_config: dict | None = None,
     ):
         super().__init__(
             env=env,
@@ -25,6 +26,7 @@ class OMEGAWrapper(MEGAWrapper):
             kde_bandwidth=kde_bandwidth,
             kde_data_discounted_factor=kde_data_discounted_factor,
             sample_dg_method=sample_dg_method,
+            estimator_config=estimator_config,
         )
 
         self.b_used_in_omega = b_used_in_omega
@@ -38,7 +40,7 @@ class OMEGAWrapper(MEGAWrapper):
             super().estimate_p_ag()
 
             # 调用super().estimate_p_ag()成功的情况
-            if sum(self.estimator.eval_res_container.success_list) > 0:
+            if self.estimator_ready:
                 # 计算KL(p_dg | p_ag)
                 all_dgs, dV = desired_goal_utils.get_all_possible_dgs_and_dV(
                     env=self.env,
@@ -90,6 +92,9 @@ class OMEGAWrapper(MEGAWrapper):
         else:
 
             self.estimate_p_ag()
+
+            if not self.estimator_ready:
+                return desired_goal_utils.sample_a_desired_goal(self.env)
 
             # 根据alpha判断如何采样desired goal
             tmp = np.random.rand()

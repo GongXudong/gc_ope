@@ -6,6 +6,7 @@ import numpy as np
 from copy import deepcopy
 
 from gc_ope.evaluate.evaluator_kde import KDEEvaluator
+from gc_ope.evaluate.evaluator_common import InsufficientSamples
 from gc_ope.evaluate.evaluation_result_container import WeightedEvaluationResultContainer
 from gc_ope.algorithm.curriculum.sync_eval_res_wrapper import SyncEvaluationResultWrapper
 from gc_ope.env.utils import desired_goal_utils
@@ -21,6 +22,7 @@ class MEGAWrapper(SyncEvaluationResultWrapper):
         kde_bandwidth: float=0.2,
         kde_data_discounted_factor: float=0.9,
         sample_dg_method: Literal["rig", "discern", "mega"] = "mega",
+        estimator_config: dict | None = None,
     ):
         super().__init__(env)
 
@@ -33,6 +35,21 @@ class MEGAWrapper(SyncEvaluationResultWrapper):
             kde_kernel=kde_kernel,
         )
 
+        # 不传配置时完整保留旧 KDE 路径；新增方法仅替换能力估计器。
+        if estimator_config is not None:
+            from gc_ope.evaluate.evaluator_planar import PlanarEvaluator
+            if not self.env.spec.id.startswith("MyPush"):
+                raise ValueError("新增估计器当前只验证了 Push 场景")
+            support = desired_goal_utils.get_all_possible_dgs(
+                env=self.env, step_x=0.02, step_y=0.02, step_z=0.02
+            )
+            self.estimator = PlanarEvaluator(
+                method=estimator_config["method"], support_goals=support,
+                kappa=kde_data_discounted_factor,
+                parameters=dict(estimator_config.get("parameters", {})),
+            )
+        self.estimator_ready = False
+
         # 根据KDE采样时使用的超参数
         self.sample_N = sample_n
         self.sample_dg_method: Literal["rig", "discern", "mega"] = sample_dg_method
@@ -43,18 +60,32 @@ class MEGAWrapper(SyncEvaluationResultWrapper):
     def after_sync_evaluation_stat_hook(self):
         self.need_re_estimate_p_ag_flag = True        
 
+    def reset_evaluation_result_container(self):
+        super().reset_evaluation_result_container()
+        self.estimator_ready = False
+        self.need_re_estimate_p_ag_flag = True
+
     def estimate_p_ag(self):
         if self.need_re_estimate_p_ag_flag:
+
+            self.estimator_ready = False
 
             print(f"\033[33mCheck in callback: {sum(self.estimator.eval_res_container.success_list)} successful dgs in eval.\033[0m")
 
             if sum(self.estimator.eval_res_container.success_list) > 0:
                 # fit KDE
-                dgs, scaled_dgs, dg_weights, dg_densities = self.estimator.fit_evaluator()
+                try:
+                    dgs, scaled_dgs, dg_weights, dg_densities = self.estimator.fit_evaluator()
+                except InsufficientSamples as exc:
+                    # 早期数据不足时等下一批评估；不隐藏真正的数值或实现错误。
+                    print(f"能力估计暂不可用：{exc}")
+                    self.need_re_estimate_p_ag_flag = False
+                    return
 
                 # get threshold for sampling
                 self.p_ag_density_threshold = np.min(dg_densities)
                 self.need_re_estimate_p_ag_flag = False
+                self.estimator_ready = True
 
     def sample_goal(self) -> Union[list, np.ndarray]:
         """先估计p_{ag}，然后根据p_{ag}使用MEGA/RIG/DISCERN中的一种方法采样desired goal
@@ -73,6 +104,9 @@ class MEGAWrapper(SyncEvaluationResultWrapper):
         else:
 
             self.estimate_p_ag()
+
+            if not self.estimator_ready:
+                return desired_goal_utils.sample_a_desired_goal(self.env)
 
             # sample N candidate goals
             candidate_goals = np.array([desired_goal_utils.sample_a_desired_goal(self.env) for _ in range(self.sample_N)])

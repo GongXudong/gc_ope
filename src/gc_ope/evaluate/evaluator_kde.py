@@ -77,6 +77,10 @@ class KDEEvaluator(EvaluatorBase):
         else:
             return scaled_desired_goals, log_densities
 
+    def sample(self, n_samples: int, random_state: int = 0) -> np.ndarray:
+        """从核混合分布采样，再还原为目标坐标。"""
+        return self.scaler.inverse_transform(self.kde.sample(n_samples, random_state))
+
     def kl_divergence_uniform_to_kde_mc(
         self,
         sample_uniform_func: Callable[[], Union[list, np.ndarray]],

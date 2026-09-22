@@ -22,6 +22,19 @@ class EvaluatorBase(ABC):
         # 数据标准化
         self.scaler = StandardScaler()
 
+    def log_density(self, desired_goals: np.ndarray) -> np.ndarray:
+        """返回原始目标坐标下的对数密度，供连续分布 KL 共用。
+
+        evaluate 保留旧接口：输出标准化空间密度。这里补上变量替换的
+        Jacobian，避免把两个模型各自的标准化坐标误当成同一个坐标系。
+        """
+        _, log_density = self.evaluate(desired_goals, scale=True, return_density=False)
+        return log_density - np.log(self.scaler.scale_).sum()
+
+    def sample(self, n_samples: int, random_state: int = 0) -> np.ndarray:
+        """从已拟合分布采样，返回原始目标坐标；子类提供实际采样算法。"""
+        raise NotImplementedError
+
     @abstractmethod
     def fit_evaluator(self) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """拟合evaluation_result_container中正样本的分布    

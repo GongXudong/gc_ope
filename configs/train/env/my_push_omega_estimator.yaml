@@ -1,0 +1,9 @@
+# 沿用旧 Push/OMEGA 环境、回调与目标采样协议，只替换能力估计器。
+defaults:
+  - my_push_omega
+  - _self_
+
+curriculum_kwargs:
+  estimator_config:
+    method: gmm  # gmm / nn / nf / fm
+    parameters: {}  # 默认参数与离线实验共用 evaluator_factory.py
