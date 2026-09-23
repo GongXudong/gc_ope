@@ -1,5 +1,11 @@
 # Goal-Conditioned Off Policy Evaluation
 
+## Push/SAC/GMM 课程训练（当前分支）
+
+师兄机器上的环境安装、剩余 seed 2～5 启动命令和文件保存位置见
+[GMM 远程运行说明](docs/GMM远程运行说明.md)。无需复制原机器的 checkpoint 或离线数据。
+当前入口使用 Conda `gc_ope`；下面保留的是旧项目说明，旧命令路径请以实际 `scripts/` 和专项文档为准。
+
 ## Prepare python Environment
 
 To run the **Reach** task, ensure that **pybullet** is installed properly. The installation of pybullet depends on **gcc**. If compilation-related errors occur on Linux systems, check if gcc is installed correctly.

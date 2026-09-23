@@ -19,6 +19,7 @@ plots/
 f16trace.csv
 dev_logs/exp_logs.md
 *.txt
+!requirements/gmm_training_constraints.txt
 
 # Local untracked research materials and generated artifacts
 nohup.out
