@@ -1,6 +1,7 @@
 """对齐旧正式训练配置，并验证真实评估回调能够驱动 GMM 课程。"""
 
 import json
+import os
 import shlex
 import subprocess
 from pathlib import Path
@@ -62,7 +63,34 @@ def test_launcher_dry_run_and_seed_selection(tmp_path):
     assert invalid.returncode == 2
 
 
-def test_real_callback_updates_weights_fits_gmm_and_trains_sac(tmp_path, monkeypatch):
+def test_launcher_saves_legacy_process_log_including_child_output(tmp_path):
+    # 在临时仓库复用真实启动函数，把百万步训练换成仅打印的子进程。
+    launcher = tmp_path / LAUNCHER.relative_to(ROOT)
+    launcher.parent.mkdir(parents=True)
+    body = LAUNCHER.read_text().split("\nrun_seed 1 ", 1)[0]
+    child = "print('find min: point [0.1 0.2 0.02] with score 0.5')"
+    probe = ("import os, subprocess, sys; "
+             "assert os.environ['PYTHONUNBUFFERED'] == '1'; "
+             f"subprocess.run([sys.executable, '-c', {child!r}], check=True); "
+             "print('stderr retained', file=sys.stderr)")
+    launcher.write_text(body + "\nrun_seed 1 conda run --no-capture-output -n gc_ope python -c "
+                        + shlex.quote(probe) + "\n")
+    subprocess.run(["bash", str(launcher)], capture_output=True, text=True, check=True,
+                   env={**os.environ, "PYTHONPATH": str(ROOT / "src")})
+    name = "omega_gmm_dscnt_0_9_b_0_n_100_eval_96_seed_1"
+    process_log = tmp_path / f"logs_in_process/my_push/sac/my_push_sac_{name}.txt"
+    console_log = tmp_path / f"logs/my_push/sac/{name}/console.log"
+    text = process_log.read_text()
+    assert text == console_log.read_text()
+    assert "find min: point [0.1 0.2 0.02] with score 0.5" in text
+    assert "stderr retained" in text
+    # 重复启动不能截断之前的完整课程日志。
+    retry = subprocess.run(["bash", str(launcher)], capture_output=True)
+    assert retry.returncode != 0
+    assert process_log.read_text() == text
+
+
+def test_real_callback_updates_weights_fits_gmm_and_trains_sac(tmp_path, monkeypatch, capsys):
     import gymnasium as gym
     import torch
     from stable_baselines3.common.monitor import Monitor
@@ -137,6 +165,15 @@ def test_real_callback_updates_weights_fits_gmm_and_trains_sac(tmp_path, monkeyp
         valid = scores >= wrapper.p_ag_density_threshold
         expected = np.argmin(np.where(valid, scores, np.inf)) if valid.any() else np.argmax(scores)
         np.testing.assert_array_equal(wrapper.sample_goal(), candidates[expected])
+        # 真正 GMM 选点产生的旧格式文本可由师兄的解析器直接读取。
+        from gc_ope.utils.train_log_process import process_file
+        process_log = tmp_path / "process.txt"
+        process_log.write_text(capsys.readouterr().out)
+        timestamps, goals, scores = process_file(
+            process_log, sample_goal_log_begin_strs=["find min", "find max"])
+        assert len(goals) >= 1
+        np.testing.assert_allclose(goals[-1], candidates[expected], atol=1e-8)
+        assert np.isfinite(scores[-1])
     finally:
         train_env.close()
         eval_env.close()

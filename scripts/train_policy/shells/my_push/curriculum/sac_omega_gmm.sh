@@ -7,6 +7,8 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../../.." && pwd)"
 cd "$repo_root"
 export PYTHONPATH="$repo_root/src${PYTHONPATH:+:$PYTHONPATH}"
 export OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1
+# 子进程中的旧 wrapper 用 print 记录课程；关闭缓冲，避免短运行/中断时遗漏。
+export PYTHONUNBUFFERED=1
 
 dry_run=false
 selected_seed=all
@@ -34,17 +36,20 @@ run_seed() {
     local name="sac/omega_gmm_dscnt_0_9_b_0_n_100_eval_96_seed_${seed}"
     local log_dir="logs/my_push/$name"
     local ckpt_dir="checkpoints/my_push/$name"
+    # 沿用师兄课程图 notebook 的目录和文件命名，仅增加 gmm 方法名。
+    local process_log="logs_in_process/my_push/sac/my_push_${name//\//_}.txt"
     # 原子创建运行目录：阻止同 seed 重复启动，也避免从头训练覆盖已有结果。
     # 中断后需要另取 experiment_name 手动启动；此入口不伪装成训练续跑。
-    if [[ -e "$ckpt_dir" ]]; then
-        echo "已有 checkpoint 目录，停止：$ckpt_dir" >&2; return 1
+    if [[ -e "$ckpt_dir" || -e "$process_log" ]]; then
+        echo "已有 checkpoint 或课程文本日志，停止：$name" >&2; return 1
     fi
     mkdir -p "$(dirname "$log_dir")"
     if ! mkdir "$log_dir"; then
         echo "已有日志或同 seed 正在运行，停止：$log_dir" >&2; return 1
     fi
+    mkdir -p "$(dirname "$process_log")"
     # Hydra 配置也随此次训练保存；pipefail 保留训练失败的退出码。
-    "$@" "hydra.run.dir=$log_dir/hydra" 2>&1 | conda run --no-capture-output -n gc_ope tee "$log_dir/console.log"
+    "$@" "hydra.run.dir=$log_dir/hydra" 2>&1 | conda run --no-capture-output -n gc_ope tee "$process_log" "$log_dir/console.log"
 }
 
 # 以下四组种子对应旧 sac_omega.sh 的前五个正式实验，保持逐项可读。

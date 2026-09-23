@@ -1,5 +1,13 @@
 # AGENTS.md
 
+## 先核对师兄旧流程，再动手
+
+- 本仓库后续任何工作，动手前先读师兄对应的入口、配置、数据生产和后续消费代码，并用现存文件核对；能保持一致就保持一致，不能先按自己的习惯设计新流程。
+- 旧代码边界：`main` 和 `dev` 中除 `初读理解.md` 外的内容。实验分支以后的新增实现不是旧惯例的证据。
+- 先说明旧流程如何运行、文件在哪里、之后怎样用于分析；只做满足当前需求的必要兼容，不擅自替换文件格式、目录、指标或随机数规则。发现旧实现限制时明确说明，不顺手改协议。
+- Push 后评估的 random/fixed 入口是 `scripts/evaluate_ckpt/`；`scripts/evaluate_new/evaluate_my_push_slide.py` 是 replay-buffer 目标评估，不能混用。
+- 课程目标沿用 wrapper 的文本输出，完整保存到 `logs_in_process/<env>/<algo>/<env>_<algo>_<设置>_seed_<n>.txt`。旧 `train_log_process.py` 与 behavioral-goals notebook 读取该文件；普通 `logs/.../log.txt` 不包含子进程选点输出。完整说明见 `docs/旧训练与数据制作流程核查.md`。
+
 ## 环境
 
 - 本项目用 conda 环境 `gc_ope` 运行，不用 uv/.venv（`.venv` 已弃用，可删除）。
@@ -10,7 +18,7 @@
 
 - 训练/评估脚本都是 hydra 配置驱动：`conda run -n gc_ope scripts/train_policy/train.py <key=value...>`，参考 `scripts/*/shells/**/*.sh` 里的实际命令。
 - 训练实验名（`experiment_name`）决定 checkpoint 落盘路径：`checkpoints/<env>/<experiment_name>/`。
-- 评估脚本（`scripts/evaluate_new/`）读取一个 checkpoint 目录，对该目录下所有 `*.zip` 生成同名 CSV。
+- random/fixed 评估脚本（`scripts/evaluate_ckpt/`）读取一个 checkpoint 目录，对该目录下所有 `*.zip` 生成对应 CSV。
 
 ## 架构要点
 

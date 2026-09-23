@@ -4,6 +4,8 @@
 
 本次新增专用配置、五组种子的启动脚本和测试，复用重构时已经实现的估计器适配接口。训练主程序、SAC、评估回调、MEGA 和 OMEGA 的代码本次均未修改。正式百万步训练尚未启动，以下验证只证明接入可运行，不证明最终训练效果。
 
+课程日志与后续制图已进一步对照师兄流程，见 [旧训练与数据制作流程核查](旧训练与数据制作流程核查.md)。课程沿用原 wrapper 的文本输出和 `train_log_process.py`，没有另加课程 CSV 格式。
+
 ## 1. 旧 KDE 在训练中负责什么
 
 按实际调用顺序阅读：
@@ -112,6 +114,8 @@ conda run --no-capture-output -n gc_ope bash scripts/train_policy/shells/my_push
 新实验名包含 `omega_gmm`，不会使用旧 `omega_...` 目录。第 N 次训练输出：
 
 ```text
+logs_in_process/my_push/sac/my_push_sac_omega_gmm_dscnt_0_9_b_0_n_100_eval_96_seed_N.txt
+  # 完整训练输出，包含每次课程选点；旧 behavioral-goals notebook 从此解析。
 checkpoints/my_push/sac/omega_gmm_dscnt_0_9_b_0_n_100_eval_96_seed_N/
   best_model.zip
   rl_model_<步数>_steps.zip
@@ -123,7 +127,7 @@ logs/my_push/sac/omega_gmm_dscnt_0_9_b_0_n_100_eval_96_seed_N/
   hydra/.hydra/          # 本次配置和命令行覆盖项
 ```
 
-已有同名日志/checkpoint 目录时启动脚本会停止，避免覆盖；同 seed 同时启动也会在原子创建日志目录时被阻止。训练失败由 `pipefail` 返回失败状态。此脚本没有实现完整恢复 SAC + replay buffer + 历史评估容器的断点续训，不能将重新启动称为续跑。中断后的目录保留用于检查；后续从头重跑应使用另一个 `experiment_name`。
+已有同名日志/checkpoint 目录或课程文本日志时启动脚本会停止，避免覆盖；同 seed 同时启动也会在原子创建日志目录时被阻止。训练失败由 `pipefail` 返回失败状态。此脚本没有实现完整恢复 SAC + replay buffer + 历史评估容器的断点续训，不能将重新启动称为续跑。中断后的目录保留用于检查；后续从头重跑应使用另一个 `experiment_name`。
 
 ## 6. 本次验证结果与范围
 
