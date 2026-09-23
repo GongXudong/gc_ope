@@ -4,7 +4,7 @@
 
 - 本项目用 conda 环境 `gc_ope` 运行，不用 uv/.venv（`.venv` 已弃用，可删除）。
 - 运行任何命令前缀：`conda run -n gc_ope <cmd>`，或直接 `conda activate gc_ope`。
-- 测试命令：`conda run -n gc_ope pytest tests/evaluate/test_evaluator_gmm.py -q`。跑单个测试文件，不要跑整个 `tests/`（部分测试会挂很久/超时）。
+- 测试命令：`conda run -n gc_ope env PYTHONPATH=src pytest tests/evaluate/test_weighted_gmm.py -q`。跑单个测试文件，不要跑整个 `tests/`（部分测试会挂很久/超时）。
 
 ## 命令模式
 
@@ -37,7 +37,7 @@
 ## 约定
 
 - 代码注释、文档、print 用中文，标识符用英文。
-- 新增 evaluator 参考 `evaluator_gmm.py`（最近的提交加了 weighted-resampled GMM）；新增 shell 参考对应场景 `shells/` 下的已有格式，逐 seed 列出完整命令。
+- 正式方法仅为 KDE/GMM/NN/NF/FM；`evaluator_gmm.py` 为直接加权 EM，NF 为验证正则化版本，FM 为三成员密度集成。历史变体从 Git 历史查阅，勿恢复为正式入口。新增 shell 参考对应场景 `shells/` 下的已有格式。
 - `.gitignore` 已忽略 `checkpoints/`、`outputs/`、`logs/`、`plots/`、`nohup.out`、`paper/`、`初读理解.pdf` —— 这些是本地实验产物，不要提交。
 
 ## 环境线程约束

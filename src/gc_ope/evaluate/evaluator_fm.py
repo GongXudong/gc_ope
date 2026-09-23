@@ -1,51 +1,40 @@
-"""二维 Flow Matching 密度估计器。
+"""FM：三个独立初始化的加噪 Flow Matching 密度等权混合。
 
-协议：
-- 只使用历史 fixed-eval 中的成功目标 (x, y)；
-- 时间折扣通过每个训练 epoch 的加权目标抽样注入；不使用 validation/early stopping；
-- 在 StandardScaler 标准化空间训练 CondOT/线性概率路径的速度场；
-- 通过固定步长 RK4 反向积分，并用二维 exact divergence 计算 continuous-flow log density；
-- ``evaluate`` 返回标准化空间密度，``evaluate_grid`` 返回 raw goal 空间密度。
-
-这是项目自己的最小实现，不依赖外部 flow-matching 包。二维 exact divergence
-使实现可审计，但 likelihood 评估会比单纯采样昂贵；正式 sweep 前应先测量耗时。
-一个 epoch 表示一次加权抽取 samples_per_epoch 个目标及一次优化器更新，
-不是遍历全部历史样本。独立配对 x0/x1，不进行 minibatch OT 匹配，不加 KDE。
-离散历史目标只提供训练样本；有限步训练的连续流并不等于精确的离散经验分布。
+每个成员用加权成功目标训练 500 次，再以 RK4 和精确二维散度计算密度。
+混合的是概率密度；采样先等概率选择成员。全程 CPU-only。
 """
 
 from __future__ import annotations
 
 import math
-import time
 from typing import Any, Union
 
 import numpy as np
 
 from gc_ope.evaluate.evaluation_result_container import EvaluationResultContainer
 from gc_ope.evaluate.evaluator_base import EvaluatorBase
-from gc_ope.evaluate.evaluator_common import positive_samples_and_weights
+from gc_ope.evaluate.evaluator_common import positive_samples_and_weights, uniform_grid_kl, validate_hidden_layers
+from gc_ope.evaluate.flow_training import FlowTraining
+from scipy.special import logsumexp
 
 
 class _VelocityMLP:
     """延迟定义的 torch MLP 工厂，避免模块导入时强制加载 torch。"""
 
     @staticmethod
-    def build(hidden_features: int):
+    def build(hidden_layer_sizes):
         import torch.nn as nn
 
-        return nn.Sequential(
-            nn.Linear(3, hidden_features),
-            nn.SiLU(),
-            nn.Linear(hidden_features, hidden_features),
-            nn.SiLU(),
-            nn.Linear(hidden_features, hidden_features),
-            nn.SiLU(),
-            nn.Linear(hidden_features, 2),
-        )
+        # 输入为 (x,y,t)，最后一层输出二维速度；列表中的每一项对应一个隐藏层。
+        layers, width = [], 3
+        for hidden in hidden_layer_sizes:
+            layers.extend([nn.Linear(width, hidden), nn.SiLU()])
+            width = hidden
+        layers.append(nn.Linear(width, 2))
+        return nn.Sequential(*layers)
 
 
-class FlowMatchingDensityEvaluator(EvaluatorBase):
+class _FMDensityInterface(EvaluatorBase):
     """二维 CondOT Flow Matching 估计器，CPU-only、无 validation。"""
 
     def __init__(
@@ -54,7 +43,7 @@ class FlowMatchingDensityEvaluator(EvaluatorBase):
         evaluation_result_container_kwargs: dict[str, Any] | None = None,
         n_epochs: int = 100,
         lr: float = 1e-3,
-        hidden_features: int = 32,
+        hidden_layer_sizes: tuple[int, ...] = (32, 32, 32),
         samples_per_epoch: int = 2000,
         ode_steps: int = 32,
         likelihood_batch_size: int = 1024,
@@ -67,7 +56,7 @@ class FlowMatchingDensityEvaluator(EvaluatorBase):
             evaluation_result_container_kwargs or {},
         )
         for name, value in {"n_epochs": n_epochs, "samples_per_epoch": samples_per_epoch,
-                            "ode_steps": ode_steps, "hidden_features": hidden_features,
+                            "ode_steps": ode_steps,
                             "likelihood_batch_size": likelihood_batch_size}.items():
             if isinstance(value, bool) or not isinstance(value, (int, np.integer)) or value <= 0:
                 raise ValueError(f"{name} 必须是正整数")
@@ -82,7 +71,7 @@ class FlowMatchingDensityEvaluator(EvaluatorBase):
 
         self.n_epochs = int(n_epochs)
         self.lr = float(lr)
-        self.hidden_features = int(hidden_features)
+        self.hidden_layer_sizes = validate_hidden_layers(hidden_layer_sizes)
         self.samples_per_epoch = int(samples_per_epoch)
         self.ode_steps = int(ode_steps)
         self.likelihood_batch_size = int(likelihood_batch_size)
@@ -111,97 +100,6 @@ class FlowMatchingDensityEvaluator(EvaluatorBase):
         if len(weights) != n or not np.all(np.isfinite(weights)) or np.any(weights <= 0):
             raise ValueError("sample weights must be positive and finite")
         return weights
-
-    def fit_evaluator(self) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        """按加权历史成功目标训练速度场。"""
-        import torch
-
-        self._fitted = False
-        positive, weights = positive_samples_and_weights(self.eval_res_container)
-        positive = self._validate_goals(positive, "positive samples")
-        weights = self._validate_weights(weights, len(positive))
-        if len(positive) < 2:
-            raise ValueError("Flow Matching requires at least two positive samples")
-
-        torch.set_num_threads(1)
-        device = torch.device(self.device)
-        scaled = self.scaler.fit_transform(positive).astype(np.float32)
-        x1_all = torch.from_numpy(scaled).to(device)
-        probabilities = torch.from_numpy((weights / weights.sum()).astype(np.float32)).to(device)
-
-        # 只固定本模型初始化，不改变调用方的全局随机数状态。
-        with torch.random.fork_rng(devices=[]):
-            torch.manual_seed(self.random_state)
-            model = _VelocityMLP.build(self.hidden_features).to(device)
-        optimizer = torch.optim.Adam(
-            model.parameters(), lr=self.lr, weight_decay=self.weight_decay
-        )
-        generator = torch.Generator(device=device).manual_seed(self.random_state + 17)
-        self._loss_curve = []
-        t0 = time.perf_counter()
-        model.train()
-        for _ in range(self.n_epochs):
-            indices = torch.multinomial(
-                probabilities,
-                self.samples_per_epoch,
-                replacement=True,
-                generator=generator,
-            )
-            x1 = x1_all[indices]
-            x0 = torch.randn(
-                (self.samples_per_epoch, 2), device=device, generator=generator
-            )
-            t = torch.rand(
-                (self.samples_per_epoch, 1), device=device, generator=generator
-            )
-            xt = (1.0 - t) * x0 + t * x1
-            target_velocity = x1 - x0
-            input_tensor = torch.cat([xt, t], dim=1)
-            predicted_velocity = model(input_tensor)
-            loss = torch.mean((predicted_velocity - target_velocity) ** 2)
-            if not torch.isfinite(loss):
-                raise FloatingPointError("FM 训练 loss 非有限，拒绝输出结果")
-            optimizer.zero_grad(set_to_none=True)
-            loss.backward()
-            optimizer.step()
-            self._loss_curve.append(float(loss.detach().cpu()))
-
-        model.eval()
-        self.model = model
-        self._fitted = True
-        train_time = time.perf_counter() - t0
-        density_t0 = time.perf_counter()
-        try:
-            scaled_log_density = self._log_density_scaled(torch.from_numpy(scaled))
-        except Exception:
-            self._fitted = False
-            raise
-        densities = np.exp(np.clip(scaled_log_density, -745.0, 709.0))
-        self.fit_diagnostics_ = {
-            "n_positive_samples": int(len(positive)),
-            "n_dim": 2,
-            "n_epochs": self.n_epochs,
-            "lr": self.lr,
-            "weight_decay": self.weight_decay,
-            "hidden_features": self.hidden_features,
-            "samples_per_epoch": self.samples_per_epoch,
-            "epoch_definition": "一次加权有放回抽样及一次优化器更新，非全数据遍历",
-            "early_stopping": False,
-            "validation_fraction": 0.0,
-            "likelihood_batch_size": self.likelihood_batch_size,
-            "fit_density_time_s": time.perf_counter() - density_t0,
-            "constant_features": np.flatnonzero(np.ptp(positive, axis=0) == 0).tolist(),
-            "ode_steps": self.ode_steps,
-            "random_state": self.random_state,
-            "device": self.device,
-            "n_params": int(sum(p.numel() for p in model.parameters())),
-            "loss_first": self._loss_curve[0],
-            "loss_final": self._loss_curve[-1],
-            "training_time_s": float(train_time),
-            "density_scheme": "CondOT FM + RK4 + exact 2D divergence",
-            "training_scheme": "weighted target resampling, no validation",
-        }
-        return positive, scaled, weights, densities
 
     def _require_fitted(self) -> None:
         if not self._fitted or self.model is None:
@@ -321,3 +219,108 @@ class FlowMatchingDensityEvaluator(EvaluatorBase):
         densities = np.maximum(self.evaluate_grid(goals), np.finfo(float).tiny)
         normalized = (densities / np.sum(densities)) / dV
         return float(u_density * np.sum(np.log(u_density) - np.log(normalized)) * dV)
+
+
+class _FMMember(FlowTraining, _FMDensityInterface):
+    """FM 集成的内部成员：目标端点加噪，固定预算拟合连续速度场。"""
+
+    def __init__(self, noise_std=.1, **kwargs):
+        kwargs.setdefault("n_epochs", 500)
+        super().__init__(**kwargs)
+        self._configure_regularization(noise_std, False, .15, 100, 100, 20, 1e-4, 300)
+
+    def _new_model(self):
+        return _VelocityMLP.build(self.hidden_layer_sizes).to("cpu")
+
+    def _training_loss(self, model, x, w, generator):
+        import torch
+        indices = torch.multinomial(w, self.samples_per_epoch, replacement=True, generator=generator)
+        target = x[indices]
+        if self.noise_std:
+            target = target + self.noise_std * torch.randn(target.shape, generator=generator)
+        source = torch.randn(target.shape, generator=generator)
+        t = torch.rand((len(target), 1), generator=generator)
+        xt = (1 - t) * source + t * target
+        return ((model(torch.cat([xt, t], 1)) - (target - source))**2).mean()
+
+    def _install_model(self, model):
+        self.model = model
+
+
+class FlowMatchingDensityEvaluator(EvaluatorBase):
+    """少数独立 FM 的等权混合；每个成员使用同一批带权历史成功目标。"""
+
+    def __init__(self, evaluation_result_container_class=EvaluationResultContainer,
+                 evaluation_result_container_kwargs=None, n_members=3, random_state=0,
+                 member_parameters=None):
+        super().__init__(evaluation_result_container_class, evaluation_result_container_kwargs or {})
+        if isinstance(n_members, bool) or not isinstance(n_members, int) or n_members < 1:
+            raise ValueError("集成成员数必须为正整数")
+        if not isinstance(random_state, int) or random_state < 0:
+            raise ValueError("初始化种子必须为非负整数")
+        self.n_members, self.random_state = n_members, random_state
+        self.member_parameters = dict(n_epochs=500, hidden_layer_sizes=(32, 32, 32), samples_per_epoch=2000,
+                                      noise_std=.1)
+        self.member_parameters.update(member_parameters or {})
+        if "random_state" in self.member_parameters:
+            raise ValueError("请在集成顶层指定 random_state，以保证成员独立初始化")
+        # 启动前检查成员参数；此时不创建网络、不拟合数据。
+        _FMMember(**self.member_parameters)
+        self.members_ = []
+
+    def fit_evaluator(self):
+        self.members_ = []
+        positive, weights = positive_samples_and_weights(self.eval_res_container)
+        self.scaler.fit(positive)
+        members = []
+        for index in range(self.n_members):
+            model = _FMMember(random_state=self.random_state + index, **self.member_parameters)
+            # 成员只读取容器；其网络和 scaler 独立。参考侧有自己的集成与容器。
+            model.eval_res_container = self.eval_res_container
+            model.fit_evaluator()
+            members.append(model)
+        self.members_ = members
+        self.fit_diagnostics_ = dict(n_members=self.n_members,
+            member_seeds=[self.random_state+i for i in range(self.n_members)],
+            members=[m.fit_diagnostics_ for m in members],
+            quality_warnings=[f"成员 {i}：{message}" for i, m in enumerate(members)
+                for message in m.fit_diagnostics_.get("quality_warnings", [])],
+            density_scheme="equal-weight arithmetic mixture of independent FM densities")
+        scaled, density = self.evaluate(positive)
+        return positive, scaled, weights, density
+
+    def _require_fitted(self):
+        if len(self.members_) != self.n_members:
+            raise RuntimeError("请先拟合 FM 集成")
+
+    def evaluate(self, desired_goals, scale=True, return_density=True):
+        self._require_fitted()
+        goals = np.asarray(desired_goals, dtype=float)
+        if goals.ndim == 1:
+            goals = goals.reshape(1, -1)
+        transformed = self.scaler.transform(goals) if scale else goals
+        raw = goals if scale else self.scaler.inverse_transform(goals)
+        logs = np.stack([member.log_density(raw) for member in self.members_])
+        # 先在共同 raw 空间平均密度，再转回旧 evaluate 约定的标准化空间。
+        mixed = logsumexp(logs, axis=0) - np.log(self.n_members) + np.log(self.scaler.scale_).sum()
+        return transformed, np.exp(mixed) if return_density else mixed
+
+    def sample(self, n_samples, random_state=0):
+        self._require_fitted()
+        if self.n_members == 1:
+            return self.members_[0].sample(n_samples, random_state)
+        rng = np.random.default_rng(random_state)
+        assignment = rng.integers(self.n_members, size=n_samples)
+        samples = np.empty((n_samples, 2))
+        for index, member in enumerate(self.members_):
+            mask = assignment == index
+            if mask.any():
+                samples[mask] = member.sample(int(mask.sum()), int(rng.integers(0, 2**32)))
+        return samples
+
+    def evaluate_grid(self, grid, return_log_density=False):
+        values = self.log_density(grid)
+        return values if return_log_density else np.exp(values)
+
+    def kl_divergence_uniform_to_kde_integrate(self, samples, dV, u_density):
+        return uniform_grid_kl(self.log_density(samples), dV, u_density)

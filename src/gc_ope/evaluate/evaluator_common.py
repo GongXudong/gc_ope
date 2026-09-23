@@ -14,6 +14,16 @@ class InsufficientSamples(ValueError):
     """数据尚不足以拟合；离线记录跳过，在线退回环境原本的目标采样。"""
 
 
+def validate_hidden_layers(values):
+    """一个元素表示一个隐藏层；拒绝含糊的单个宽度，避免隐式重复层数。"""
+    if not isinstance(values, (list, tuple)) or not values:
+        raise ValueError("hidden_layer_sizes 必须为非空列表或元组，例如 [16, 16]")
+    if any(isinstance(value, bool) or not isinstance(value, (int, np.integer)) or value < 1
+           for value in values):
+        raise ValueError("每个隐藏层宽度必须为正整数")
+    return tuple(int(value) for value in values)
+
+
 def uniform_grid_kl(log_density, dV, u_density):
     """保留课程学习的网格积分协议，使用 logsumexp 避免密度下溢。"""
     from scipy.special import logsumexp

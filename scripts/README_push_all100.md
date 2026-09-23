@@ -27,7 +27,9 @@ bash /home/tacmon/workspace/ex_SSD/gc_ope_refactor/scripts/run_push_all100.sh --
 - 共 4 × 5 × 100 = **2000 条记录**；样本不足会明确跳过，仍保留对应记录。
 - 每份 fixed CSV 从全部记录有放回抽 100 条，包含当前 checkpoint；四方法共享抽样。
 - 参考模型和历史估计模型使用同一种估计器；KL 为参考全量分布到历史估计分布。
-- 每次 MC 10000 点，重复 5 次；FM 500 次优化器更新、宽度 32。
+- 每次 MC 10000 点，重复 5 次；FM 三个成员各 500 次更新、隐藏层 [32,32,32]。
+- GMM 为直接加权 EM（reg_covar=0.05），NF 为 [16,16] 的正则化版本，NN 为概率 log-loss 早停。
+- 正式方法名仅为 `kde/gmm/nn/nf/fm`，旧方法后缀不再支持。图中的 KDE 复用已保存旧投稿结果。
 
 所有拟合参数显式保存在 `configs/evaluate/push_same_family_all100.json`，
 启动时复制到输出目录的 `experiment.json`，续跑会核对参数、输入与代码。
@@ -37,7 +39,7 @@ bash /home/tacmon/workspace/ex_SSD/gc_ope_refactor/scripts/run_push_all100.sh --
 默认输出根目录：
 
 ```text
-gc_ope_refactor/logs/push_same_family_all100_5x4/
+gc_ope_refactor/logs/push_final_five_5x4/
 ├── master.log                       # 总进度；每 30 秒更新各 seed 完成条数
 ├── config.json                      # 调度参数、输入哈希及入口代码哈希
 ├── experiment.json                  # 本次拟合与 MC 的完整显式参数
@@ -75,3 +77,15 @@ Ctrl-C 或 SIGTERM 会停止五个 seed 及其 worker，保留已落盘的结果
 四方法顺序、续跑、配置隔离、缺失输入、重复启动、Ctrl-C 和 seed 异常退出。
 测试只有一个 checkpoint，模型仅训练两次、MC 只采 16 点，不是正式结果。
 正式实验由用户手动启动。
+
+## 画正式五方法图
+
+```bash
+conda run -n gc_ope python scripts/plot_fig6.py --output plots/fig6_final_methods_new
+```
+
+默认来源是 `configs/evaluate/fig6_sources.json`，指向已完成、已确认的四方法优化结果和旧 KDE。
+它仅映射展示名称，不改写旧 CSV。迁移机器须准备这些 CSV，或修改来源路径并核对摘要。
+若今后用正式方法名新跑了结果，可增加 `--result-root logs/push_final_five_5x4`。
+图不平滑，五条实线，按 KDE/GMM/NN/FM/NF 顺序使用 Seaborn 默认 deep 配色。
+全工作记录、旧实验版本及当前使用方法见 `docs/重构全过程与最终五方法报告.md`。

@@ -22,9 +22,14 @@ class ExperimentConfig:
     mc_seed: int = 0
     kl_mode: str = "raw"
     parameters: dict = field(default_factory=lambda: {key: dict(value) for key, value in DEFAULT_PARAMETERS.items()})
-    protocol: str = "push_same_family_nn_logloss_v2"
+    protocol: str = "push_final_five_v1"
 
     def __post_init__(self):
+        unknown = set(self.parameters) - set(DEFAULT_PARAMETERS)
+        if unknown:
+            raise ValueError(f"配置包含已退役或未知的方法：{sorted(unknown)}")
+        if self.protocol != "push_final_five_v1":
+            raise ValueError("旧协议配置不能用于正式五方法，请使用 push_same_family_all100.json")
         if not 0 < self.kappa <= 1 or not np.isfinite(self.kappa):
             raise ValueError("时间折扣必须在 (0,1] 内")
         if min(self.samples_per_checkpoint, self.mc_samples, self.mc_repeats) <= 0:
@@ -72,7 +77,7 @@ def run_checkpoint(config, method, seed, checkpoint):
         warnings = [f"{side}侧：{message}" for side, model in
                     [("历史", estimate_model), ("参考", reference_model)]
                     for message in getattr(model, "fit_diagnostics_", {}).get("quality_warnings", [])]
-        if method in {"gmm_em", "nf_reg", "fm_reg", "fm_ensemble"} or (method == "nn" and estimate_model.early_stopping):
+        if method in {"gmm", "nf", "fm"} or (method == "nn" and estimate_model.early_stopping):
             row["fit_quality"] = "warning" if warnings else "passed_checks"
         row["fit_warnings"] = "；".join(warnings)
         metric = monte_carlo_kl(reference_model, estimate_model, config.mc_samples,

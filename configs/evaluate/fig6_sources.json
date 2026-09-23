@@ -1,0 +1,74 @@
+{
+  "sources": [
+    {
+      "name": "KDE",
+      "method": "kde",
+      "root": "../gc_ope/plots/p_ag_dist_between_truth_and_estimated_in_training/my_push/sac/eval_data",
+      "protocol": "legacy",
+      "sha256": {
+        "my_push_sac_seed_1_kde_0_9_eval_res_in_training.csv": "bdbb58edff930f72da6e70164c4f0e0854ec4fa51a2d6ec479cb1951e60ac341",
+        "my_push_sac_seed_2_kde_0_9_eval_res_in_training.csv": "14cef21620239688c44f86be9f7e36613d7ed8868927871d56fedd4a70c204a2",
+        "my_push_sac_seed_3_kde_0_9_eval_res_in_training.csv": "a29865e23651e3c0987da51db6a71de0b25c351129ace074b2f4191c8ca5c17d",
+        "my_push_sac_seed_4_kde_0_9_eval_res_in_training.csv": "28969cd45a19f8e3d6f753f8975104ce61d179bc6c2b643b0f7560b359f9b3e6",
+        "my_push_sac_seed_5_kde_0_9_eval_res_in_training.csv": "19073cc6ae759c16b90371449788277caa8b26f1f95447cf898b49d967fb8866"
+      }
+    },
+    {
+      "name": "GMM",
+      "method": "gmm_em",
+      "root": "logs/gmm_em_reg005_all100_5x4",
+      "protocol": "push_same_family_gmm_em_v1",
+      "sha256": {
+        "experiment.json": "c2b662b2651b5a70f9aa942fc366ee4906c651536bc3f190f8a5ef21a6b200b0",
+        "method_per_seed/gmm_em_push_seed1.csv": "9510c3fa401735fd8c761225c0a7d92259874861d1bbddbf91308c53726f35d1",
+        "method_per_seed/gmm_em_push_seed2.csv": "8579d638b06d648fb97fbe554227cd889f43e3356d414430547af93af9ff8010",
+        "method_per_seed/gmm_em_push_seed3.csv": "62b8ce8f985760fae7ec214e766ac27af09b34f504a65d1b5fdb7ccd9a99ec00",
+        "method_per_seed/gmm_em_push_seed4.csv": "888b53f10502d14c9c6ebec4f624289523641bccdc90eb2cc4c93ba2655cc30e",
+        "method_per_seed/gmm_em_push_seed5.csv": "0cd17c806a1ad16ab31c5edf89f87b52e04bf3de49a99db5462c5bcdbe1424d8"
+      }
+    },
+    {
+      "name": "NN",
+      "method": "nn",
+      "root": "logs/nn_logloss_v2_all100_5x4",
+      "protocol": "push_same_family_nn_logloss_v2",
+      "sha256": {
+        "method_per_seed/nn_push_seed1.csv": "26d698487b51289acbf96668124ea77eb677dc1ed07aea289eaa170971f76717",
+        "method_per_seed/nn_push_seed2.csv": "e1777ce850a74d0777adf514f6cc36f607692f0aa9de356845e02442def3c60e",
+        "method_per_seed/nn_push_seed3.csv": "0df01db1645a3c3cacfa46070fe45b18dcc5d13b0bf0508b3cc3ad6eacdb8061",
+        "method_per_seed/nn_push_seed4.csv": "3a52841576739b950ea9ebd0695a5e5c2d294a0b53772586e1f4aa7f2503e103",
+        "method_per_seed/nn_push_seed5.csv": "53331f5f3fb7f23aaf4009fcdd215a8bed9f6a5ea21a8e250fd7ef725a0129e8",
+        "experiment.json": "2495a2d9a42c3bd91129f2767a70a4cb3cf0ad2356c3bbbc0c833f8e15fe7b53"
+      }
+    },
+    {
+      "name": "FM",
+      "method": "fm_ensemble",
+      "root": "logs/fm_ensemble_all100_5x4",
+      "protocol": "push_regularized_flows_v1",
+      "sha256": {
+        "method_per_seed/fm_ensemble_push_seed1.csv": "5b20adf7548f8ad9532f089a3db687721774416147e4102d946f598510dcae7c",
+        "method_per_seed/fm_ensemble_push_seed2.csv": "64ddf5d9b950be9501a5c86f3e5232baab4768802ee5df95b791cb7264371ffd",
+        "method_per_seed/fm_ensemble_push_seed3.csv": "bbd4ae56762e206a4021e0cd802097fd890bc0366da70b602130172461a053ac",
+        "method_per_seed/fm_ensemble_push_seed4.csv": "88a039144b0cd10f26a429b16e172ad43453256648858e57dd255215bdc58904",
+        "method_per_seed/fm_ensemble_push_seed5.csv": "a92deb81de5f1436b9d5ffe04135fbcbcba4a22e287863ac388691e19adf64ba",
+        "experiment.json": "97b549d56d457cd9a7225ca34cf443dfb8d103ffdd412dc55530397969de4d93"
+      }
+    },
+    {
+      "name": "NF",
+      "method": "nf_reg",
+      "root": "logs/nf_regularized_all100_5x4",
+      "protocol": "push_regularized_flows_v1",
+      "sha256": {
+        "method_per_seed/nf_reg_push_seed1.csv": "d4e7223fc4d24d2bef31df9f863a9214176fc30c19a0c2fbb524a7a7634819e2",
+        "method_per_seed/nf_reg_push_seed2.csv": "0461a14486ed4e227e94060a92f85852c487d3e7124e5e9ec416c6abd94b6a1e",
+        "method_per_seed/nf_reg_push_seed3.csv": "68afdffdf7d8cc6921688417807e4bd0c25803af0a9380ce62d3f9bea0dde726",
+        "method_per_seed/nf_reg_push_seed4.csv": "3e2decb33d5e3beba3d852555183a2888697c6294207499b118cf6db964a0d88",
+        "method_per_seed/nf_reg_push_seed5.csv": "2802883da0db0627e03f0f5d419ca942097820e045af041cc4ed9f3dbd03ff70",
+        "experiment.json": "9838469e378caf41d4efe67b4b90bc763e7edcba3e5beeecd51e46e7c0005913"
+      }
+    }
+  ],
+  "selection": "用户确认的最终五方法；仅修改展示名，原 CSV 的方法身份和数值保留"
+}

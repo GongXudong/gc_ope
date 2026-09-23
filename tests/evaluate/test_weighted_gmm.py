@@ -125,7 +125,7 @@ def test_iteration_limit_is_reported():
 
 def test_evaluator_caps_components_and_keeps_raw_density_contract():
     X = np.array([[1., 2.], [1., 2.]])
-    model = make_evaluator("gmm_em")
+    model = make_evaluator("gmm")
     EvaluationBatch(X, np.ones(2, dtype=bool), np.array([.2, 1.])).fill(model)
     model.fit_evaluator()
     assert model.gmm.n_components == 1

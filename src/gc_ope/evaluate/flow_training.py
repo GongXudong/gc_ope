@@ -1,13 +1,7 @@
-"""独立的正则化 NF/FM：目标噪声、验证选轮数、全数据重拟合。
-
-保留旧 NF/FM 的采样和连续密度接口，不修改旧算法。噪声只用于训练目标，
-最终密度仍由流本身给出，不把查询点再送入 KDE，也不改变 MC KL 的定义。
-"""
+"""流模型共用的加噪训练、按目标分组验证和全数据重拟合流程。"""
 
 import numpy as np
 from gc_ope.evaluate.evaluator_common import positive_samples_and_weights
-from gc_ope.evaluate.evaluator_nf import NormalizingFlowDensityEvaluator
-from gc_ope.evaluate.evaluator_fm import FlowMatchingDensityEvaluator, _VelocityMLP
 
 
 def spatial_validation_split(goals, fraction, random_state):
@@ -25,7 +19,7 @@ def spatial_validation_split(goals, fraction, random_state):
     return np.flatnonzero(~valid), np.flatnonzero(valid)
 
 
-class _RegularizedTraining:
+class FlowTraining:
     """共享训练流程；两类流只定义模型、训练目标和验证密度。"""
 
     def _configure_regularization(self, noise_std, early_stopping, validation_fraction,
@@ -133,77 +127,7 @@ class _RegularizedTraining:
             validation_space="training-standardized", selection_loss_curve=selection_loss,
             final_refit_records=len(positive), final_loss_first=losses[0], final_loss_last=losses[-1],
             quality_warnings=warnings, training_scheme="noisy targets + weighted validation + full refit",
-            random_state=self.random_state, device="cpu")
+            random_state=self.random_state, hidden_layer_sizes=list(self.hidden_layer_sizes), device="cpu")
         return positive, scaled, weights, np.exp(np.clip(log_density, -745, 709))
 
 
-class RegularizedNFEvaluator(_RegularizedTraining, NormalizingFlowDensityEvaluator):
-    """加噪加权似然的 NF；原 NF 的标准化、采样与密度接口保持一致。"""
-
-    def __init__(self, noise_std=.2, early_stopping=True, validation_fraction=.15,
-                 min_epochs=30, patience=50, validation_interval=10, tol=1e-4,
-                 fallback_epochs=50, **kwargs):
-        kwargs.setdefault("n_epochs", 300)
-        kwargs.setdefault("hidden_features", 16)
-        kwargs.setdefault("transforms", 2)
-        super().__init__(**kwargs)
-        self._configure_regularization(noise_std, early_stopping, validation_fraction,
-                                       min_epochs, patience, validation_interval, tol, fallback_epochs)
-
-    def _new_model(self):
-        import zuko
-        return zuko.flows.NSF(features=2, transforms=self.transforms, bins=self.bins,
-                              hidden_features=(self.hidden_features, self.hidden_features)).to("cpu")
-
-    def _training_loss(self, model, x, w, generator):
-        import torch
-        noisy = x + self.noise_std * torch.randn(x.shape, generator=generator) if self.noise_std else x
-        return -(w * model().log_prob(noisy)).sum()
-
-    def _validation_log_density(self, model, x):
-        import torch
-        with torch.no_grad():
-            return model().log_prob(torch.as_tensor(x, dtype=torch.float32)).numpy()
-
-    def _install_model(self, model):
-        self.flow, self._distribution = model, model()
-
-
-class RegularizedFMEvaluator(_RegularizedTraining, FlowMatchingDensityEvaluator):
-    """对 FM 的目标端点加噪，再由验证密度选训练预算；不是给输出密度套 KDE。"""
-
-    def __init__(self, noise_std=.2, early_stopping=True, validation_fraction=.15,
-                 min_epochs=100, patience=100, validation_interval=20, tol=1e-4,
-                 fallback_epochs=300, **kwargs):
-        kwargs.setdefault("n_epochs", 1000)
-        kwargs.setdefault("hidden_features", 32)
-        kwargs.setdefault("samples_per_epoch", 2000)
-        super().__init__(**kwargs)
-        self._configure_regularization(noise_std, early_stopping, validation_fraction,
-                                       min_epochs, patience, validation_interval, tol, fallback_epochs)
-
-    def _new_model(self):
-        return _VelocityMLP.build(self.hidden_features).to("cpu")
-
-    def _training_loss(self, model, x, w, generator):
-        import torch
-        indices = torch.multinomial(w, self.samples_per_epoch, replacement=True, generator=generator)
-        target = x[indices]
-        if self.noise_std:
-            target = target + self.noise_std * torch.randn(target.shape, generator=generator)
-        source = torch.randn(target.shape, generator=generator)
-        t = torch.rand((len(target), 1), generator=generator)
-        xt = (1 - t) * source + t * target
-        return ((model(torch.cat([xt, t], 1)) - (target - source))**2).mean()
-
-    def _validation_log_density(self, model, x):
-        import torch
-        # 父类的 ODE 接口读取 self.model；每次验证都指定当前训练阶段的模型。
-        self.model, self._fitted = model, True
-        try:
-            return self._log_density_scaled(torch.as_tensor(x, dtype=torch.float32))
-        finally:
-            self._fitted = False
-
-    def _install_model(self, model):
-        self.model = model

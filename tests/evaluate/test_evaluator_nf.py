@@ -16,7 +16,7 @@ def _fit(seed: int = 0, epochs: int = 3) -> NormalizingFlowDensityEvaluator:
         evaluation_result_container_class=WeightedEvaluationResultContainer,
         evaluation_result_container_kwargs={"discounted_factor": 0.9},
         n_epochs=epochs,
-        hidden_features=8,
+        hidden_layer_sizes=[8, 8],
         transforms=2,
         bins=4,
         random_state=seed,

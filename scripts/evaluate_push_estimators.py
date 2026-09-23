@@ -43,7 +43,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--checkpoint-root", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--methods", nargs="+", choices=["nn", "fm", "nf", "gmm", "gmm_em", "kde", "nf_reg", "fm_reg", "fm_ensemble"], default=["nn", "fm", "nf", "gmm"])
+    parser.add_argument("--methods", nargs="+", choices=["nn", "fm", "nf", "gmm", "kde"], default=["nn", "fm", "nf", "gmm"])
     parser.add_argument("--seeds", nargs="+", type=int, choices=range(1, 6), default=[1, 2, 3, 4, 5])
     parser.add_argument("--checkpoints", nargs="+", type=int,
                         help="省略时要求完整的 100 个 checkpoint（10000 到 1000000）")

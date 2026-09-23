@@ -37,12 +37,11 @@ def test_history_is_shared_inclusive_and_stable(tmp_path):
 
 
 @pytest.mark.parametrize("method,parameters", [
-    ("gmm", {}), ("gmm_em", {}), ("nn", {"n_epochs": 2, "early_stopping": False}),
-    ("nf", {"n_epochs": 1}), ("fm", {"n_epochs": 1, "samples_per_epoch": 16, "ode_steps": 2}),
-    ("nf_reg", {"n_epochs": 2, "min_epochs": 1, "validation_interval": 1}),
-    ("fm_reg", {"n_epochs": 2, "samples_per_epoch": 16, "ode_steps": 2, "min_epochs": 1, "validation_interval": 1}),
-    ("fm_ensemble", {"n_members": 2, "member_parameters": {"n_epochs": 2, "samples_per_epoch": 16, "ode_steps": 2}}),
+    ("kde", {}), ("gmm", {}), ("nn", {"n_epochs": 2, "early_stopping": False}),
+    ("nf", {"n_epochs": 2, "min_epochs": 1, "validation_interval": 1}),
+    ("fm", {"n_members": 2, "member_parameters": {"n_epochs": 2, "samples_per_epoch": 16, "ode_steps": 2}}),
 ])
+
 def test_pair_is_same_family_independent_and_uses_correct_records(tmp_path, method, parameters):
     write_checkpoint(tmp_path, 10000)
     config = ExperimentConfig(str(tmp_path), parameters={method: parameters}, mc_samples=16, mc_repeats=1)

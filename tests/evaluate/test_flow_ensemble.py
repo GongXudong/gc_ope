@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 from scipy.stats import multivariate_normal
-from gc_ope.evaluate.evaluator_flow_ensemble import FlowEnsembleEvaluator
+from gc_ope.evaluate.evaluator_fm import FlowMatchingDensityEvaluator, _FMMember
 from gc_ope.evaluate.evaluator_factory import make_evaluator, fit_evaluator
 from gc_ope.evaluate.offline_data import EvaluationBatch
 
@@ -16,7 +16,7 @@ def test_density_is_arithmetic_mixture_and_sampling_matches_it():
             return self.distribution.logpdf(goals)
         def sample(self, n, random_state):
             return np.asarray(self.distribution.rvs(n, random_state=random_state)).reshape(-1, 2)
-    model = FlowEnsembleEvaluator(n_members=2)
+    model = FlowMatchingDensityEvaluator(n_members=2)
     model.scaler.fit([[-3., -1.], [5., 3.]])
     model.members_ = [Gaussian([-2., 0.]), Gaussian([2., 0.])]
     points = np.array([[-2., 0.], [0., 0.], [2., 0.]])
@@ -30,14 +30,16 @@ def test_density_is_arithmetic_mixture_and_sampling_matches_it():
     np.testing.assert_allclose(samples.var(0), [4.04, .04], rtol=.04)
 
 
-def test_one_member_matches_old_fm_and_multiple_members_are_independent():
-    parameters = dict(n_epochs=2, hidden_features=8, samples_per_epoch=32, ode_steps=4)
+def test_one_member_matches_member_and_multiple_members_are_independent():
+    parameters = dict(n_epochs=2, hidden_layer_sizes=[8, 8, 8], samples_per_epoch=32, ode_steps=4)
     x = np.random.default_rng(4).normal(size=(30, 2))
     data = EvaluationBatch(x, np.ones(30, bool), np.linspace(.1, 1, 30))
-    old = make_evaluator("fm", parameters=parameters)
-    single = make_evaluator("fm_ensemble", parameters=dict(n_members=1, member_parameters=parameters))
-    multi = make_evaluator("fm_ensemble", parameters=dict(n_members=2, member_parameters=parameters))
-    for method, model in [("fm", old), ("fm_ensemble", single), ("fm_ensemble", multi)]:
+    from gc_ope.evaluate.evaluation_result_container import WeightedEvaluationResultContainer
+    old = _FMMember(evaluation_result_container_class=WeightedEvaluationResultContainer,
+                    evaluation_result_container_kwargs={"discounted_factor": .9}, **parameters)
+    single = make_evaluator("fm", parameters=dict(n_members=1, member_parameters=parameters))
+    multi = make_evaluator("fm", parameters=dict(n_members=2, member_parameters=parameters))
+    for method, model in [("fm", old), ("fm", single), ("fm", multi)]:
         data.fill(model)
         fit_evaluator(method, model)
     np.testing.assert_allclose(old.log_density(x), single.log_density(x), atol=1e-6)
@@ -51,4 +53,4 @@ def test_one_member_matches_old_fm_and_multiple_members_are_independent():
     {"member_parameters": {"random_state": 0}}])
 def test_invalid_configuration_rejected(parameters):
     with pytest.raises(ValueError):
-        FlowEnsembleEvaluator(**parameters)
+        FlowMatchingDensityEvaluator(**parameters)

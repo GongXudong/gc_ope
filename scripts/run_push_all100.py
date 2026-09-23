@@ -26,7 +26,7 @@ from gc_ope.evaluate.offline_results import (
 
 
 METHODS = ("nn", "fm", "nf", "gmm")
-AVAILABLE_METHODS = (*METHODS, "gmm_em", "nf_reg", "fm_reg", "fm_ensemble")
+AVAILABLE_METHODS = METHODS
 
 
 def run_directory(output, method, seed):
@@ -117,10 +117,10 @@ def run_stage(args, method, config_path, report):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--checkpoint-root", type=Path, default=ROOT.parent / "gc_ope/checkpoints")
-    parser.add_argument("--output", type=Path, default=ROOT / "logs/push_same_family_nn_logloss_v2_5x4")
+    parser.add_argument("--output", type=Path, default=ROOT / "logs/push_final_five_5x4")
     parser.add_argument("--config", type=Path, default=ROOT / "configs/evaluate/push_same_family_all100.json")
     parser.add_argument("--methods", nargs="+", choices=AVAILABLE_METHODS, default=list(METHODS),
-                        help="默认四方法；修正 NN 后可只重跑 nn，仍保留五 seed × 四 worker")
+                        help="默认四种新增方法，KDE 沿用旧结果；五 seed × 四 worker")
     parser.add_argument("--seeds", type=int, nargs="+", choices=range(1, 6), default=[1, 2, 3, 4, 5])
     parser.add_argument("--checkpoints", type=int, nargs="+", default=list(range(10000, 1000001, 10000)))
     parser.add_argument("--workers-per-seed", type=int, choices=range(1, 5), default=4)

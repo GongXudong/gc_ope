@@ -42,7 +42,7 @@ def validate_case(root, seed, step, split_seed, method, candidate, parameters):
                    train_records=len(ti), valid_records=len(vi),
                    valid_ess=float(valid.weights.sum()**2 / (valid.weights**2).sum()),
                    fit=model.fit_diagnostics_)
-        if method in {"gmm", "gmm_em"}:
+        if method in {"gmm"}:
             row["minimum_scaled_covariance_eigenvalue"] = float(np.linalg.eigvalsh(model.gmm.covariances_).min())
     except Exception:
         row["error"] = traceback.format_exc()
@@ -69,13 +69,12 @@ def main():
     started = time.perf_counter()
     write_json(args.output / "process.json", dict(pid=os.getpid(), command=sys.argv))
     base = json.loads(args.base_config.read_text())
-    base["parameters"].update(json.loads((ROOT / "configs/evaluate/push_gmm_em_all100.json").read_text())["parameters"])
     candidates = json.loads(args.candidates.read_text())
     # 先声明候选和任务，再运行；跨 seed 检查及全量参考 KL 均不能回头修改胜者。
     cases = [(1, step, split) for step in [100000, 400000, 1000000] for split in [1701, 1702]]
     transfer_seeds, transfer_steps, pilot_steps = [2, 3, 4, 5], [100000, 1000000], [10000, 100000, 1000000]
     if args.smoke:
-        candidates = {"gmm_em": {key: candidates["gmm_em"][key] for key in ["baseline", "reg_0p01"]}}
+        candidates = {"gmm": {key: candidates["gmm"][key] for key in ["baseline", "reg_0p01"]}}
         cases = [(1, 100000, 1701)]
         transfer_seeds, transfer_steps, pilot_steps = [2], [100000], [100000]
     resolved = {method: {name: {**base["parameters"][method], **override}
@@ -84,8 +83,7 @@ def main():
                validation_fraction=.2, group="source_checkpoint,csv_row", criterion="mean raw weighted heldout NLL",
                transfer_seeds=transfer_seeds, transfer_steps=transfer_steps,
                pilot_steps=pilot_steps, mc_samples=10000, mc_repeats=5))
-    source_paths = [Path(__file__), args.candidates, args.base_config,
-                    ROOT / "configs/evaluate/push_gmm_em_all100.json"]
+    source_paths = [Path(__file__), args.candidates, args.base_config]
     source_paths += list((ROOT / "src/gc_ope/evaluate").rglob("*.py"))
     input_paths = [path for seed in [1, *transfer_seeds] for step, path in fixed_files(args.checkpoint_root, seed).items()
                    if step <= max(case[1] for case in cases)]

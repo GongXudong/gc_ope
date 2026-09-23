@@ -16,41 +16,65 @@
       "validation_fraction": 0.1,
       "n_iter_no_change": 30,
       "bandwidth": 0.2,
-      "hidden_layer_sizes": [16, 16],
+      "hidden_layer_sizes": [
+        16,
+        16
+      ],
       "min_epochs": 50,
       "tol": 0.0001
     },
     "fm": {
-      "n_epochs": 500,
-      "hidden_features": 32,
-      "samples_per_epoch": 2000,
-      "lr": 0.001,
-      "weight_decay": 0.0,
-      "ode_steps": 32,
-      "likelihood_batch_size": 1024,
+      "n_members": 3,
       "random_state": 0,
-      "device": "cpu"
+      "member_parameters": {
+        "n_epochs": 500,
+        "samples_per_epoch": 2000,
+        "lr": 0.001,
+        "weight_decay": 0.0,
+        "ode_steps": 32,
+        "likelihood_batch_size": 1024,
+        "device": "cpu",
+        "noise_std": 0.1,
+        "hidden_layer_sizes": [
+          32,
+          32,
+          32
+        ]
+      }
     },
     "nf": {
-      "n_epochs": 100,
-      "hidden_features": 32,
+      "n_epochs": 300,
+      "transforms": 2,
+      "bins": 8,
       "lr": 0.001,
       "weight_decay": 0.0,
-      "transforms": 4,
-      "bins": 8,
+      "noise_std": 0.2,
+      "early_stopping": true,
+      "validation_fraction": 0.15,
+      "min_epochs": 30,
+      "patience": 50,
+      "validation_interval": 10,
+      "tol": 0.0001,
+      "fallback_epochs": 50,
       "random_state": 0,
-      "device": "cpu"
+      "device": "cpu",
+      "hidden_layer_sizes": [
+        16,
+        16
+      ]
     },
     "gmm": {
       "n_components": 5,
-      "resample_size": 1000,
       "covariance_type": "full",
       "n_init": 1,
       "max_iter": 200,
       "tol": 0.001,
-      "random_state": 0,
-      "reg_covar": 0.000001
+      "reg_covar": 0.05,
+      "random_state": 0
+    },
+    "kde": {
+      "kde_bandwidth": 0.2
     }
   },
-  "protocol": "push_same_family_nn_logloss_v2"
+  "protocol": "push_final_five_v1"
 }

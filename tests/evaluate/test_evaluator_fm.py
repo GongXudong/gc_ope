@@ -4,18 +4,18 @@ import numpy as np
 import pytest
 
 from gc_ope.evaluate.evaluation_result_container import WeightedEvaluationResultContainer
-from gc_ope.evaluate.evaluator_fm import FlowMatchingDensityEvaluator
+from gc_ope.evaluate.evaluator_fm import _FMMember
 
 
-def _fit(seed: int = 0, epochs: int = 2) -> FlowMatchingDensityEvaluator:
+def _fit(seed: int = 0, epochs: int = 2) -> _FMMember:
     rng = np.random.default_rng(123)
     goals = rng.normal(loc=0.0, scale=0.12, size=(24, 2))
     weights = np.linspace(0.5, 1.5, len(goals))
-    evaluator = FlowMatchingDensityEvaluator(
+    evaluator = _FMMember(
         evaluation_result_container_class=WeightedEvaluationResultContainer,
         evaluation_result_container_kwargs={"discounted_factor": 0.9},
         n_epochs=epochs,
-        hidden_features=8,
+        hidden_layer_sizes=[8, 8, 8],
         samples_per_epoch=64,
         ode_steps=4,
         likelihood_batch_size=7,
@@ -37,7 +37,7 @@ def test_fm_density_is_finite_and_positive():
     assert np.all(np.isfinite(density)) and np.all(density > 0)
     assert np.all(np.isfinite(raw_density)) and np.all(raw_density > 0)
     assert evaluator.fit_diagnostics_["early_stopping"] is False
-    assert evaluator.fit_diagnostics_["validation_fraction"] == 0.0
+    assert evaluator.fit_diagnostics_["selection_validation_records"] == 0
 
 
 def test_fm_reproducible_with_same_seed():
@@ -56,14 +56,14 @@ def test_fm_likelihood_query_is_chunked():
 
 
 def test_fm_rejects_unfitted_evaluate():
-    evaluator = FlowMatchingDensityEvaluator()
+    evaluator = _FMMember()
     with pytest.raises(RuntimeError, match="fit_evaluator"):
         evaluator.evaluate(np.zeros((1, 2)))
 
 
 def test_fm_uses_fixed_training_budget_without_validation():
     evaluator = _fit()
-    assert evaluator.fit_diagnostics_["training_scheme"].endswith("no validation")
+    assert evaluator.fit_diagnostics_["selection_reason"] == "fixed_budget"
 
 
 @pytest.mark.parametrize("a", [0.0, 0.4, -0.3])
@@ -75,7 +75,7 @@ def test_analytic_linear_flow_likelihood_sign_and_jacobian(a):
         def forward(self, xt):
             return a * xt[:, :2]
 
-    evaluator = FlowMatchingDensityEvaluator(ode_steps=32, likelihood_batch_size=2)
+    evaluator = _FMMember(ode_steps=32, likelihood_batch_size=2)
     evaluator.model = LinearVelocity()
     evaluator._fitted = True
     evaluator.scaler.fit(np.array([[-2., -4.], [2., 4.]]))
@@ -105,10 +105,10 @@ def test_weighted_sampling_probabilities_and_failure_exclusion(monkeypatch):
         return original(weights, *args, **kwargs)
 
     monkeypatch.setattr(torch, "multinomial", capture)
-    ev = FlowMatchingDensityEvaluator(
+    ev = _FMMember(
         evaluation_result_container_class=WeightedEvaluationResultContainer,
         evaluation_result_container_kwargs={"discounted_factor": 0.9},
-        n_epochs=2, hidden_features=4, samples_per_epoch=16, ode_steps=2,
+        n_epochs=2, hidden_layer_sizes=[4, 4, 4], samples_per_epoch=16, ode_steps=2,
     )
     ev.eval_res_container.add_batch(
         [[-1., -2.], [1., 2.], [999., 999.]], [True, True, False],
@@ -130,7 +130,7 @@ def test_weighted_sampling_probabilities_and_failure_exclusion(monkeypatch):
 ])
 def test_rejects_invalid_parameters(kwargs):
     with pytest.raises(ValueError):
-        FlowMatchingDensityEvaluator(**kwargs)
+        _FMMember(**kwargs)
 
 
 def test_fm_fit_preserves_global_rng_and_query_does_not_accumulate_gradients():

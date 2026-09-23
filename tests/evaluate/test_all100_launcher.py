@@ -28,8 +28,8 @@ def arguments(tmp_path, *, slow=False):
             directory / "rl_model_10000_steps_eval_res_on_fixed.csv", index=False)
     config = {"mc_samples": 16, "mc_repeats": 1, "parameters": {
         "nn": {"n_epochs": 100000 if slow else 2, "early_stopping": False},
-        "fm": {"n_epochs": 2, "samples_per_epoch": 16, "hidden_features": 4, "ode_steps": 2},
-        "nf": {"n_epochs": 2, "hidden_features": 4, "transforms": 1},
+        "fm": {"n_members": 1, "member_parameters": {"n_epochs": 2, "samples_per_epoch": 16, "hidden_layer_sizes": [4, 4, 4], "ode_steps": 2}},
+        "nf": {"n_epochs": 2, "hidden_layer_sizes": [4, 4], "transforms": 1},
         "gmm": {"n_components": 2},
     }}
     path = tmp_path / "settings.json"
@@ -92,17 +92,17 @@ def test_nn_only_preserves_5_by_4_parallelism(tmp_path):
     assert "--methods fm" not in result.stdout
 
 
-def test_weighted_em_runs_as_separate_method(tmp_path):
+def test_gmm_is_the_selected_weighted_em(tmp_path):
     args = arguments(tmp_path)
     settings = tmp_path / "settings.json"
     config = json.loads(settings.read_text())
-    config["protocol"] = "push_same_family_gmm_em_v1"
-    config["parameters"]["gmm_em"] = {"n_components": 2}
+    config["protocol"] = "push_final_five_v1"
+    config["parameters"]["gmm"] = {"n_components": 2}
     settings.write_text(json.dumps(config))
-    result = subprocess.run([*args, "--methods", "gmm_em"], capture_output=True, text=True, timeout=120)
+    result = subprocess.run([*args, "--methods", "gmm"], capture_output=True, text=True, timeout=120)
     assert result.returncode == 0, result.stdout + result.stderr
     outputs = list((tmp_path / "result/method_per_seed").glob("*.csv"))
-    assert len(outputs) == 5 and all(p.name.startswith("gmm_em_") for p in outputs)
+    assert len(outputs) == 5 and all(p.name.startswith("gmm_") for p in outputs)
     assert json.loads((tmp_path / "result/audit.json").read_text())["status"] == "complete"
 
 

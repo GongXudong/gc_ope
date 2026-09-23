@@ -10,13 +10,10 @@ from gc_ope.evaluate.utils.distribution_kl import monte_carlo_kl
 
 
 PARAMETERS = {
-    "kde": {}, "gmm": {"n_components": 2}, "gmm_em": {"n_components": 2},
+    "kde": {}, "gmm": {"n_components": 2},
     "nn": {"n_epochs": 5, "early_stopping": False},
-    "nf": {"n_epochs": 2, "hidden_features": 8, "transforms": 2},
-    "fm": {"n_epochs": 2, "hidden_features": 8, "samples_per_epoch": 32, "ode_steps": 8},
-    "nf_reg": {"n_epochs": 2, "hidden_features": 8, "transforms": 2, "early_stopping": False},
-    "fm_reg": {"n_epochs": 2, "hidden_features": 8, "samples_per_epoch": 32, "ode_steps": 8, "early_stopping": False},
-    "fm_ensemble": {"n_members": 2, "member_parameters": {"n_epochs": 2, "hidden_features": 8, "samples_per_epoch": 32, "ode_steps": 8}},
+    "nf": {"n_epochs": 2, "hidden_layer_sizes": [8, 8], "transforms": 2},
+    "fm": {"n_members": 2, "member_parameters": {"n_epochs": 2, "hidden_layer_sizes": [8, 8, 8], "samples_per_epoch": 32, "ode_steps": 4}},
 }
 
 
@@ -91,11 +88,11 @@ def test_mc_direction_against_analytic_gaussians():
 
 def test_fm_forward_sampling_matches_known_linear_flow():
     import torch
-    from gc_ope.evaluate.evaluator_fm import FlowMatchingDensityEvaluator
+    from gc_ope.evaluate.evaluator_fm import _FMMember
     class Velocity(torch.nn.Module):
         def forward(self, xt):
             return .4 * xt[:, :2]
-    model = FlowMatchingDensityEvaluator(ode_steps=32)
+    model = _FMMember(ode_steps=32)
     model.model, model._fitted = Velocity(), True
     model.scaler.fit([[-2, -4], [2, 4]])
     source = torch.randn((100, 2), generator=torch.Generator().manual_seed(9)).numpy()

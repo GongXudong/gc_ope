@@ -13,13 +13,9 @@ from gc_ope.evaluate.evaluator_kde import KDEEvaluator
 
 PARAMETERS = {
     "gmm": {"n_components": 2},
-    "gmm_em": {"n_components": 2},
     "nn": {"n_epochs": 2, "early_stopping": False},
-    "nf": {"n_epochs": 1, "hidden_features": 8, "transforms": 2},
-    "fm": {"n_epochs": 1, "hidden_features": 8, "samples_per_epoch": 32, "ode_steps": 2},
-    "nf_reg": {"n_epochs": 2, "hidden_features": 8, "transforms": 2, "min_epochs": 1, "validation_interval": 1},
-    "fm_reg": {"n_epochs": 2, "hidden_features": 8, "samples_per_epoch": 32, "ode_steps": 2, "min_epochs": 1, "validation_interval": 1},
-    "fm_ensemble": {"n_members": 2, "member_parameters": {"n_epochs": 2, "hidden_features": 8, "samples_per_epoch": 32, "ode_steps": 2}},
+    "nf": {"n_epochs": 1, "hidden_layer_sizes": [8, 8], "transforms": 2},
+    "fm": {"n_members": 2, "member_parameters": {"n_epochs": 2, "hidden_layer_sizes": [8, 8, 8], "samples_per_epoch": 32, "ode_steps": 4}},
 }
 
 
@@ -66,7 +62,7 @@ def test_real_push_and_sac_can_use_estimator(method, tmp_path):
         vec.close()
 
 
-@pytest.mark.parametrize("method", ["nn", "nf", "fm", "nf_reg", "fm_reg", "fm_ensemble"])
+@pytest.mark.parametrize("method", ["nn", "nf", "fm"])
 def test_early_sample_shortage_falls_back(method):
     wrapper = make_env(method)
     try:
