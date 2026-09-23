@@ -1,0 +1,24 @@
+# 以旧 sac_omega.sh 的正式配置为基准，仅用最终版加权 GMM 替换 KDE。
+defaults:
+  - my_push_omega
+  - _self_
+
+curriculum_kwargs:
+  sample_n: 100
+  kde_data_discounted_factor: 0.9  # 保留旧参数名：每轮评估后，历史权重乘以 κ。
+  sample_dg_method: mega
+  b_used_in_omega: 0
+  estimator_config:
+    method: gmm
+    # 显式固定离线验证后的参数，避免以后修改工厂默认值影响本实验。
+    parameters:
+      n_components: 5
+      covariance_type: full
+      n_init: 1
+      max_iter: 200
+      tol: 0.001
+      reg_covar: 0.05
+      random_state: 0
+
+# 在线数据由 sac_omega 回调产生：每 10000 步评估 6×16=96 个 episode。
+# 不读取离线 checkpoint CSV，也不进行“有放回抽取 100 条”的离线操作。
