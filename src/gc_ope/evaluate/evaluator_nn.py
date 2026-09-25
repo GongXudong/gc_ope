@@ -27,9 +27,11 @@ class GoalSuccessMLPClassifierEvaluator:
         self,
         *,
         hidden_width: int = 16,
+        hidden_layer_sizes: tuple[int, ...] | list[int] | None = None,
         n_epochs: int = 100,
         lr: float = 1e-3,
         alpha: float = 1e-4,
+        bandwidth: float | None = None,
         random_state: int = 0,
         probability_floor: float = 1e-12,
         early_stopping: bool = True,
@@ -38,12 +40,24 @@ class GoalSuccessMLPClassifierEvaluator:
     ) -> None:
         if hidden_width <= 0:
             raise ValueError("hidden_width must be positive")
+        if hidden_layer_sizes is None:
+            layer_sizes = (int(hidden_width), int(hidden_width))
+        else:
+            layer_sizes = tuple(hidden_layer_sizes)
+            if len(layer_sizes) != 2 or any(
+                isinstance(value, bool) or not isinstance(value, (int, np.integer)) or value <= 0
+                for value in layer_sizes
+            ):
+                raise ValueError("hidden_layer_sizes must contain exactly two positive integers")
+            hidden_width = int(layer_sizes[0])
         if n_epochs <= 0:
             raise ValueError("n_epochs must be positive")
         if lr <= 0 or not np.isfinite(lr):
             raise ValueError("lr must be positive and finite")
         if alpha < 0 or not np.isfinite(alpha):
             raise ValueError("alpha must be non-negative and finite")
+        if bandwidth is not None and (bandwidth <= 0 or not np.isfinite(bandwidth)):
+            raise ValueError("bandwidth must be positive and finite when provided")
         if probability_floor <= 0 or not np.isfinite(probability_floor):
             raise ValueError("probability_floor must be positive and finite")
         if not 0.0 < validation_fraction < 1.0 or not np.isfinite(validation_fraction):
@@ -52,9 +66,11 @@ class GoalSuccessMLPClassifierEvaluator:
             raise ValueError("n_iter_no_change must be positive")
 
         self.hidden_width = int(hidden_width)
+        self.hidden_layer_sizes = tuple(int(value) for value in layer_sizes)
         self.n_epochs = int(n_epochs)
         self.lr = float(lr)
         self.alpha = float(alpha)
+        self.bandwidth = None if bandwidth is None else float(bandwidth)
         self.random_state = int(random_state)
         self.probability_floor = float(probability_floor)
         self.early_stopping = bool(early_stopping)
@@ -114,7 +130,7 @@ class GoalSuccessMLPClassifierEvaluator:
         self.scaler.fit(x)
         scaled_x = self.scaler.transform(x)
         self.classifier = MLPClassifier(
-            hidden_layer_sizes=(self.hidden_width, self.hidden_width),
+            hidden_layer_sizes=self.hidden_layer_sizes,
             activation="relu",
             solver="adam",
             alpha=self.alpha,
@@ -139,7 +155,7 @@ class GoalSuccessMLPClassifierEvaluator:
             "n_failure": int(np.sum(y == 0)),
             "n_support_goals": int(len(self.support_goals_)),
             "hidden_width": self.hidden_width,
-            "hidden_layer_sizes": [self.hidden_width, self.hidden_width],
+            "hidden_layer_sizes": list(self.hidden_layer_sizes),
             "n_epochs": self.n_epochs,
             "n_iter": int(self.classifier.n_iter_),
             "early_stopping": self.early_stopping,
@@ -149,6 +165,7 @@ class GoalSuccessMLPClassifierEvaluator:
             "best_validation_score": (float(self.classifier.best_validation_score_) if self.early_stopping else None),
             "lr": self.lr,
             "alpha": self.alpha,
+            "bandwidth": self.bandwidth,
             "random_state": self.random_state,
             "target_scheme": "goal_to_P(success)_with_sample_weight",
             "support_scheme": "current_checkpoint_unique_fixed_eval_goals",
@@ -176,8 +193,15 @@ class GoalSuccessMLPClassifierEvaluator:
         normalizer = float(np.sum(support_probability))
         if not np.isfinite(normalizer) or normalizer <= 0:
             raise ValueError("NN success probabilities have an invalid support normalizer")
-        query_probability = self.predict_success_probability(goals)
-        return (query_probability / normalizer) / self.support_cell_area_
+        if self.bandwidth is None:
+            query_probability = self.predict_success_probability(goals)
+            return (query_probability / normalizer) / self.support_cell_area_
+
+        # 搜索协议中的 bandwidth 将分类器的成功率平滑为连续密度。
+        distances = (goals[:, None, :] - self.support_goals_[None, :, :]) / self.bandwidth
+        kernels = np.exp(-0.5 * np.sum(distances * distances, axis=2))
+        kernel_normalizer = 2.0 * np.pi * self.bandwidth**2
+        return (kernels @ support_probability) / (normalizer * kernel_normalizer)
 
     def evaluate(self, desired_goals: np.ndarray, scale: bool = True, return_density: bool = True):
         """返回查询点密度；raw density 由当前 checkpoint 支持网格归一化得到。"""
@@ -202,3 +226,17 @@ class GoalSuccessMLPClassifierEvaluator:
         if return_log_density:
             return np.log(np.maximum(raw_density, np.finfo(float).tiny))
         return raw_density
+
+    def sample(self, n_samples: int, random_state: int = 0) -> np.ndarray:
+        """从成功率加权的高斯核混合采样。"""
+        self._require_fitted()
+        if isinstance(n_samples, bool) or not isinstance(n_samples, (int, np.integer)) or n_samples <= 0:
+            raise ValueError("n_samples must be a positive integer")
+        rng = np.random.default_rng(random_state)
+        support = np.asarray(self.support_goals_, dtype=float)
+        probability = self.predict_success_probability(support)
+        probability /= probability.sum()
+        centers = support[rng.choice(len(support), size=int(n_samples), replace=True, p=probability)]
+        if self.bandwidth is None:
+            return centers
+        return centers + rng.normal(0.0, self.bandwidth, size=centers.shape)

@@ -1,0 +1,25 @@
+# Push 无课程学习 fixed-eval 的统一离线协议快照。
+# 估计器搜索配置位于同目录 hyperparameter_search/ 下。
+task: push
+training_algorithm: sac
+data_roots:
+  - checkpoints/my_push/sac/seed_1
+  - checkpoints/my_push/sac/seed_2
+  - checkpoints/my_push/sac/seed_3
+  - checkpoints/my_push/sac/seed_4
+  - checkpoints/my_push/sac/seed_5
+methods: [gmm, nn, nf, fm]
+evaluation_csv_suffix: eval_res_on_fixed
+goal_columns: [x, y]
+samples_per_checkpoint: 100
+include_current_checkpoint: true
+sampling: with_replacement
+sampling_seed: 0
+mc_seed: 0
+global_seed: 0
+kappa: 0.9
+reference_fit: same_method_same_parameters_on_current_checkpoint_full_csv
+kl_direction: reference_full || historical_estimate
+mc_samples: 10000
+mc_repeats: 5
+legacy_kde_direct_search_target: false

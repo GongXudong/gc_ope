@@ -41,6 +41,9 @@ class NormalizingFlowDensityEvaluator(EvaluatorBase):
         hidden_features: int = 32,
         transforms: int = 4,
         bins: int = 8,
+        hidden_layer_sizes: tuple[int, ...] | list[int] | None = None,
+        noise_std: float = 0.0,
+        patience: int | None = None,
         random_state: int = 0,
         device: str = "cpu",
     ):
@@ -56,6 +59,22 @@ class NormalizingFlowDensityEvaluator(EvaluatorBase):
             raise ValueError("weight_decay must be finite and non-negative")
         if hidden_features <= 0 or transforms <= 0 or bins < 2:
             raise ValueError("hidden_features/transforms must be positive and bins >= 2")
+        if hidden_layer_sizes is None:
+            layer_sizes = (int(hidden_features), int(hidden_features))
+        else:
+            layer_sizes = tuple(hidden_layer_sizes)
+            if len(layer_sizes) != 2 or any(
+                isinstance(value, bool) or not isinstance(value, (int, np.integer)) or value <= 0
+                for value in layer_sizes
+            ):
+                raise ValueError("hidden_layer_sizes must contain exactly two positive integers")
+            hidden_features = int(layer_sizes[0])
+        if noise_std < 0 or not np.isfinite(noise_std):
+            raise ValueError("noise_std must be finite and non-negative")
+        if patience is not None and (
+            isinstance(patience, bool) or not isinstance(patience, (int, np.integer)) or patience <= 0
+        ):
+            raise ValueError("patience must be a positive integer when provided")
         if device != "cpu":
             raise ValueError("NormalizingFlowDensityEvaluator currently supports device='cpu' only")
 
@@ -63,8 +82,11 @@ class NormalizingFlowDensityEvaluator(EvaluatorBase):
         self.lr = float(lr)
         self.weight_decay = float(weight_decay)
         self.hidden_features = int(hidden_features)
+        self.hidden_layer_sizes = tuple(int(value) for value in layer_sizes)
         self.transforms = int(transforms)
         self.bins = int(bins)
+        self.noise_std = float(noise_std)
+        self.patience = None if patience is None else int(patience)
         self.random_state = int(random_state)
         self.device = device
         self.flow = None
@@ -117,7 +139,7 @@ class NormalizingFlowDensityEvaluator(EvaluatorBase):
             features=2,
             transforms=self.transforms,
             bins=self.bins,
-            hidden_features=(self.hidden_features, self.hidden_features),
+            hidden_features=self.hidden_layer_sizes,
         ).to(self.device)
         distribution = flow()
         optimizer = torch.optim.Adam(
@@ -127,9 +149,18 @@ class NormalizingFlowDensityEvaluator(EvaluatorBase):
         )
 
         self._loss_curve = []
+        generator = torch.Generator(device=self.device).manual_seed(self.random_state + 17)
+        best_loss = float("inf")
+        best_state = None
+        stale_epochs = 0
         flow.train()
         for _ in range(self.n_epochs):
-            log_prob = distribution.log_prob(x)
+            train_x = x
+            if self.noise_std > 0:
+                train_x = x + self.noise_std * torch.randn(
+                    x.shape, generator=generator, dtype=x.dtype, device=x.device
+                )
+            log_prob = distribution.log_prob(train_x)
             loss = -(w * log_prob).sum()
             optimizer.zero_grad()
             loss.backward()
@@ -138,6 +169,19 @@ class NormalizingFlowDensityEvaluator(EvaluatorBase):
             # reacquire it after each optimizer step to avoid stale transforms.
             distribution = flow()
             self._loss_curve.append(float(loss.detach().cpu()))
+            loss_value = self._loss_curve[-1]
+            if loss_value < best_loss - 1e-12:
+                best_loss = loss_value
+                stale_epochs = 0
+                if self.patience is not None:
+                    best_state = {key: value.detach().clone() for key, value in flow.state_dict().items()}
+            elif self.patience is not None:
+                stale_epochs += 1
+                if stale_epochs >= self.patience:
+                    break
+
+        if best_state is not None:
+            flow.load_state_dict(best_state)
 
         flow.eval()
         self.flow = flow
@@ -153,8 +197,11 @@ class NormalizingFlowDensityEvaluator(EvaluatorBase):
             "lr": self.lr,
             "weight_decay": self.weight_decay,
             "hidden_features": self.hidden_features,
+            "hidden_layer_sizes": list(self.hidden_layer_sizes),
             "transforms": self.transforms,
             "bins": self.bins,
+            "noise_std": self.noise_std,
+            "patience": self.patience,
             "random_state": self.random_state,
             "device": self.device,
             "n_params": int(sum(parameter.numel() for parameter in flow.parameters())),
@@ -204,6 +251,17 @@ class NormalizingFlowDensityEvaluator(EvaluatorBase):
         if return_log_density:
             return raw_log_density
         return np.exp(np.clip(raw_log_density, -745.0, 709.0))
+
+    def sample(self, n_samples: int, random_state: int = 0) -> np.ndarray:
+        """从 NSF 采样并还原到原始目标坐标。"""
+        import torch
+        self._require_fitted()
+        if isinstance(n_samples, bool) or not isinstance(n_samples, (int, np.integer)) or n_samples <= 0:
+            raise ValueError("n_samples must be a positive integer")
+        with torch.random.fork_rng(devices=[]), torch.no_grad():
+            torch.manual_seed(int(random_state))
+            scaled = self._distribution.sample((int(n_samples),)).cpu().numpy()
+        return self.scaler.inverse_transform(scaled)
 
     def kl_divergence_uniform_to_kde_integrate(
         self,

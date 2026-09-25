@@ -22,6 +22,18 @@ class EvaluatorBase(ABC):
         # 数据标准化
         self.scaler = StandardScaler()
 
+    def log_density(self, desired_goals: np.ndarray) -> np.ndarray:
+        """返回原始目标坐标下的对数密度，供离线 MC-KL 共用。"""
+        _, values = self.evaluate(desired_goals, scale=True, return_density=False)
+        scale = np.asarray(self.scaler.scale_, dtype=float)
+        if scale.ndim != 1 or not np.all(np.isfinite(scale)) or np.any(scale <= 0):
+            raise ValueError("拟合的 scaler 存在非正或非有限的 scale")
+        return np.asarray(values, dtype=float) - np.log(scale).sum()
+
+    def sample(self, n_samples: int, random_state: int = 0) -> np.ndarray:
+        """从已拟合模型采样，返回原始目标坐标；子类提供实现。"""
+        raise NotImplementedError
+
     @abstractmethod
     def fit_evaluator(self) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """拟合evaluation_result_container中正样本的分布    

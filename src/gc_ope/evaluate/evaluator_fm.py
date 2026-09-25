@@ -31,18 +31,16 @@ class _VelocityMLP:
     """延迟定义的 torch MLP 工厂，避免模块导入时强制加载 torch。"""
 
     @staticmethod
-    def build(hidden_features: int):
+    def build(hidden_features: int | tuple[int, ...] | list[int]):
         import torch.nn as nn
-
-        return nn.Sequential(
-            nn.Linear(3, hidden_features),
-            nn.SiLU(),
-            nn.Linear(hidden_features, hidden_features),
-            nn.SiLU(),
-            nn.Linear(hidden_features, hidden_features),
-            nn.SiLU(),
-            nn.Linear(hidden_features, 2),
-        )
+        layer_sizes = (hidden_features,) if isinstance(hidden_features, int) else tuple(hidden_features)
+        modules = []
+        input_features = 3
+        for width in layer_sizes:
+            modules.extend([nn.Linear(input_features, width), nn.SiLU()])
+            input_features = width
+        modules.append(nn.Linear(input_features, 2))
+        return nn.Sequential(*modules)
 
 
 class FlowMatchingDensityEvaluator(EvaluatorBase):
@@ -59,6 +57,10 @@ class FlowMatchingDensityEvaluator(EvaluatorBase):
         ode_steps: int = 32,
         likelihood_batch_size: int = 1024,
         weight_decay: float = 0.0,
+        n_members: int = 1,
+        hidden_layer_sizes: tuple[int, ...] | list[int] | None = None,
+        noise_std: float = 0.0,
+        patience: int | None = None,
         random_state: int = 0,
         device: str = "cpu",
     ):
@@ -77,16 +79,38 @@ class FlowMatchingDensityEvaluator(EvaluatorBase):
             raise ValueError("lr must be positive and finite")
         if weight_decay < 0 or not np.isfinite(weight_decay):
             raise ValueError("weight_decay must be finite and non-negative")
+        if isinstance(n_members, bool) or not isinstance(n_members, (int, np.integer)) or n_members <= 0:
+            raise ValueError("n_members must be a positive integer")
+        if hidden_layer_sizes is None:
+            layer_sizes = (int(hidden_features), int(hidden_features), int(hidden_features))
+        else:
+            layer_sizes = tuple(hidden_layer_sizes)
+            if len(layer_sizes) != 2 or any(
+                isinstance(value, bool) or not isinstance(value, (int, np.integer)) or value <= 0
+                for value in layer_sizes
+            ):
+                raise ValueError("hidden_layer_sizes must contain exactly two positive integers")
+            hidden_features = int(layer_sizes[0])
+        if noise_std < 0 or not np.isfinite(noise_std):
+            raise ValueError("noise_std must be finite and non-negative")
+        if patience is not None and (
+            isinstance(patience, bool) or not isinstance(patience, (int, np.integer)) or patience <= 0
+        ):
+            raise ValueError("patience must be a positive integer when provided")
         if device != "cpu":
             raise ValueError("FlowMatchingDensityEvaluator currently supports device='cpu' only")
 
         self.n_epochs = int(n_epochs)
         self.lr = float(lr)
         self.hidden_features = int(hidden_features)
+        self.hidden_layer_sizes = tuple(int(value) for value in layer_sizes)
         self.samples_per_epoch = int(samples_per_epoch)
         self.ode_steps = int(ode_steps)
         self.likelihood_batch_size = int(likelihood_batch_size)
         self.weight_decay = float(weight_decay)
+        self.n_members = int(n_members)
+        self.noise_std = float(noise_std)
+        self.patience = None if patience is None else int(patience)
         self.random_state = int(random_state)
         self.device = device
         self.model = None
@@ -132,12 +156,15 @@ class FlowMatchingDensityEvaluator(EvaluatorBase):
         # 只固定本模型初始化，不改变调用方的全局随机数状态。
         with torch.random.fork_rng(devices=[]):
             torch.manual_seed(self.random_state)
-            model = _VelocityMLP.build(self.hidden_features).to(device)
+            model = _VelocityMLP.build(self.hidden_layer_sizes).to(device)
         optimizer = torch.optim.Adam(
             model.parameters(), lr=self.lr, weight_decay=self.weight_decay
         )
         generator = torch.Generator(device=device).manual_seed(self.random_state + 17)
         self._loss_curve = []
+        best_loss = float("inf")
+        best_state = None
+        stale_epochs = 0
         t0 = time.perf_counter()
         model.train()
         for _ in range(self.n_epochs):
@@ -148,6 +175,10 @@ class FlowMatchingDensityEvaluator(EvaluatorBase):
                 generator=generator,
             )
             x1 = x1_all[indices]
+            if self.noise_std > 0:
+                x1 = x1 + self.noise_std * torch.randn(
+                    x1.shape, device=device, generator=generator
+                )
             x0 = torch.randn(
                 (self.samples_per_epoch, 2), device=device, generator=generator
             )
@@ -165,6 +196,19 @@ class FlowMatchingDensityEvaluator(EvaluatorBase):
             loss.backward()
             optimizer.step()
             self._loss_curve.append(float(loss.detach().cpu()))
+            loss_value = self._loss_curve[-1]
+            if loss_value < best_loss - 1e-12:
+                best_loss = loss_value
+                stale_epochs = 0
+                if self.patience is not None:
+                    best_state = {key: value.detach().clone() for key, value in model.state_dict().items()}
+            elif self.patience is not None:
+                stale_epochs += 1
+                if stale_epochs >= self.patience:
+                    break
+
+        if best_state is not None:
+            model.load_state_dict(best_state)
 
         model.eval()
         self.model = model
@@ -183,7 +227,9 @@ class FlowMatchingDensityEvaluator(EvaluatorBase):
             "n_epochs": self.n_epochs,
             "lr": self.lr,
             "weight_decay": self.weight_decay,
+            "n_members": self.n_members,
             "hidden_features": self.hidden_features,
+            "hidden_layer_sizes": list(self.hidden_layer_sizes),
             "samples_per_epoch": self.samples_per_epoch,
             "epoch_definition": "一次加权有放回抽样及一次优化器更新，非全数据遍历",
             "early_stopping": False,
@@ -200,6 +246,8 @@ class FlowMatchingDensityEvaluator(EvaluatorBase):
             "training_time_s": float(train_time),
             "density_scheme": "CondOT FM + RK4 + exact 2D divergence",
             "training_scheme": "weighted target resampling, no validation",
+            "noise_std": self.noise_std,
+            "patience": self.patience,
         }
         return positive, scaled, weights, densities
 
@@ -289,6 +337,27 @@ class FlowMatchingDensityEvaluator(EvaluatorBase):
         if return_log_density:
             return raw_log_density
         return np.exp(np.clip(raw_log_density, -745.0, 709.0))
+
+    def sample(self, n_samples: int, random_state: int = 0) -> np.ndarray:
+        """从标准高斯出发，沿已拟合速度场正向 RK4 采样。"""
+        import torch
+        self._require_fitted()
+        if isinstance(n_samples, bool) or not isinstance(n_samples, (int, np.integer)) or n_samples <= 0:
+            raise ValueError("n_samples must be a positive integer")
+        generator = torch.Generator(device=self.device).manual_seed(int(random_state))
+        x = torch.randn((int(n_samples), 2), generator=generator, device=self.device)
+        dt = 1.0 / self.ode_steps
+        with torch.no_grad():
+            for step in range(self.ode_steps):
+                t = step * dt
+                k1 = self._velocity(x, t)
+                k2 = self._velocity(x + dt * k1 / 2, t + dt / 2)
+                k3 = self._velocity(x + dt * k2 / 2, t + dt / 2)
+                k4 = self._velocity(x + dt * k3, t + dt)
+                x = x + dt * (k1 + 2 * k2 + 2 * k3 + k4) / 6
+        if not torch.isfinite(x).all():
+            raise FloatingPointError("FM 正向采样产生非有限坐标")
+        return self.scaler.inverse_transform(x.cpu().numpy())
 
     def kl_divergence_uniform_to_kde_integrate(
         self,

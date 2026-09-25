@@ -217,6 +217,20 @@ class GMMEvaluator(EvaluatorBase):
             return log_density
         return np.exp(np.clip(log_density, -745.0, 709.0))
 
+    def sample(self, n_samples: int, random_state: int = 0) -> np.ndarray:
+        """从标准化 GMM 采样并还原到原始目标坐标。"""
+        if not self._fitted:
+            raise RuntimeError("GMMEvaluator.sample() 需要先调用 fit_evaluator() 拟合 GMM")
+        if isinstance(n_samples, bool) or not isinstance(n_samples, (int, np.integer)) or n_samples <= 0:
+            raise ValueError("n_samples must be a positive integer")
+        previous_state = self.gmm.random_state
+        self.gmm.random_state = int(random_state)
+        try:
+            scaled, _ = self.gmm.sample(int(n_samples))
+        finally:
+            self.gmm.random_state = previous_state
+        return self.scaler.inverse_transform(np.asarray(scaled, dtype=float))
+
     def kl_divergence_uniform_to_kde_integrate(
         self, samples: Union[list, np.ndarray], dV: float, u_density: float
     ) -> float:
